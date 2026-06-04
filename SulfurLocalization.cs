@@ -40,13 +40,6 @@ namespace Ryuka.Sulfur.NativeUI
             if (string.IsNullOrWhiteSpace(pluginDir))
                 return;
 
-            string langDir = Path.Combine(pluginDir, "lang");
-
-            if (!Directory.Exists(langDir))
-                return;
-
-            string[] files = Directory.GetFiles(langDir, "*.json", SearchOption.TopDirectoryOnly);
-
             Dictionary<string, Dictionary<string, string>> pluginMap;
             if (!data.TryGetValue(pluginGuid, out pluginMap))
             {
@@ -54,31 +47,11 @@ namespace Ryuka.Sulfur.NativeUI
                 data[pluginGuid] = pluginMap;
             }
 
-            foreach (string file in files)
+            HashSet<string> loadedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string directory in GetLocalizationSearchDirectories(pluginDir))
             {
-                try
-                {
-                    string langCode = Path.GetFileNameWithoutExtension(file);
-                    Dictionary<string, string> langMap = LoadLangFile(file);
-
-                    if (langMap.Count == 0)
-                    {
-                        if (Plugin.Log != null)
-                            Plugin.Log.LogWarning("Localization file has 0 entries: " + file);
-
-                        continue;
-                    }
-
-                    pluginMap[langCode] = langMap;
-
-                    if (Plugin.Log != null)
-                        Plugin.Log.LogInfo("Loaded localization: " + pluginGuid + " / " + langCode + " / " + langMap.Count + " entries");
-                }
-                catch (Exception ex)
-                {
-                    if (Plugin.Log != null)
-                        Plugin.Log.LogWarning("Failed to load localization file: " + file + " / " + ex.Message);
-                }
+                LoadLocalizationDirectory(pluginGuid, pluginMap, directory, loadedFiles);
             }
         }
 
@@ -126,6 +99,211 @@ namespace Ryuka.Sulfur.NativeUI
             cachedRawLanguage = raw;
             cachedLanguageCode = code;
             LanguageVersion++;
+        }
+
+        private static IEnumerable<string> GetLocalizationSearchDirectories(string pluginDir)
+        {
+            if (string.IsNullOrWhiteSpace(pluginDir))
+                yield break;
+
+            // Preferred structure:
+            // Plugin.dll
+            // lang/en.json
+            string langDir = Path.Combine(pluginDir, "lang");
+            if (Directory.Exists(langDir))
+                yield return langDir;
+
+            // Gale / mod manager flattened structure:
+            // Plugin.dll
+            // en.json
+            // zh-CN.json
+            if (Directory.Exists(pluginDir))
+                yield return pluginDir;
+
+            // Extra compatibility:
+            // Some managers may put dll in one folder but keep lang next to the package folder.
+            DirectoryInfo parent = Directory.GetParent(pluginDir);
+            if (parent != null)
+            {
+                string parentLangDir = Path.Combine(parent.FullName, "lang");
+                if (Directory.Exists(parentLangDir))
+                    yield return parentLangDir;
+            }
+        }
+
+        private static void LoadLocalizationDirectory(
+            string pluginGuid,
+            Dictionary<string, Dictionary<string, string>> pluginMap,
+            string directory,
+            HashSet<string> loadedFiles)
+        {
+            if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+                return;
+
+            string[] files;
+
+            try
+            {
+                files = Directory.GetFiles(directory, "*.json", SearchOption.TopDirectoryOnly);
+            }
+            catch (Exception ex)
+            {
+                if (Plugin.Log != null)
+                    Plugin.Log.LogWarning("Failed to list localization directory: " + directory + " / " + ex.Message);
+
+                return;
+            }
+
+            foreach (string file in files)
+            {
+                if (string.IsNullOrWhiteSpace(file))
+                    continue;
+
+                if (loadedFiles.Contains(file))
+                    continue;
+
+                loadedFiles.Add(file);
+
+                string langCode = Path.GetFileNameWithoutExtension(file);
+
+                if (!IsLikelyLanguageFileName(langCode))
+                    continue;
+
+                try
+                {
+                    Dictionary<string, string> langMap = LoadLangFile(file);
+
+                    if (langMap.Count == 0)
+                    {
+                        if (Plugin.Log != null)
+                            Plugin.Log.LogWarning("Localization file has 0 entries: " + file);
+
+                        continue;
+                    }
+
+                    MergeLangMap(pluginMap, langCode, langMap);
+
+                    if (Plugin.Log != null)
+                    {
+                        Plugin.Log.LogInfo(
+                            "Loaded localization: " +
+                            pluginGuid + " / " +
+                            langCode + " / " +
+                            langMap.Count + " entries / " +
+                            file);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (Plugin.Log != null)
+                        Plugin.Log.LogWarning("Failed to load localization file: " + file + " / " + ex.Message);
+                }
+            }
+        }
+
+        private static void MergeLangMap(
+            Dictionary<string, Dictionary<string, string>> pluginMap,
+            string langCode,
+            Dictionary<string, string> newMap)
+        {
+            if (pluginMap == null || string.IsNullOrWhiteSpace(langCode) || newMap == null || newMap.Count == 0)
+                return;
+
+            Dictionary<string, string> existingMap;
+
+            if (!pluginMap.TryGetValue(langCode, out existingMap))
+            {
+                pluginMap[langCode] = new Dictionary<string, string>(newMap, StringComparer.OrdinalIgnoreCase);
+                return;
+            }
+
+            // Search order is:
+            // 1. lang/
+            // 2. plugin root
+            //
+            // So if lang/ already provided a key, root-level fallback should not override it.
+            foreach (KeyValuePair<string, string> pair in newMap)
+            {
+                if (string.IsNullOrWhiteSpace(pair.Key))
+                    continue;
+
+                if (!existingMap.ContainsKey(pair.Key))
+                    existingMap[pair.Key] = pair.Value ?? "";
+            }
+        }
+
+        private static bool IsLikelyLanguageFileName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return false;
+
+            string value = name.Trim();
+
+            if (value.Equals("manifest", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (value.Equals("package", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (value.Equals("config", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (value.Length < 2 || value.Length > 16)
+                return false;
+
+            string normalized = value.Replace('_', '-');
+            string[] parts = normalized.Split('-');
+
+            if (parts.Length == 0)
+                return false;
+
+            if (!IsAlpha(parts[0]))
+                return false;
+
+            if (parts[0].Length < 2 || parts[0].Length > 3)
+                return false;
+
+            for (int i = 1; i < parts.Length; i++)
+            {
+                if (string.IsNullOrWhiteSpace(parts[i]))
+                    return false;
+
+                if (parts[i].Length < 2 || parts[i].Length > 8)
+                    return false;
+
+                if (!IsAlphaNumeric(parts[i]))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsAlpha(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (!char.IsLetter(value[i]))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsAlphaNumeric(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (!char.IsLetterOrDigit(value[i]))
+                    return false;
+            }
+
+            return true;
         }
 
         private static Dictionary<string, string> LoadLangFile(string file)
