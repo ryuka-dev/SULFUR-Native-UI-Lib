@@ -82,6 +82,7 @@
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SulfurCustomCategoryMarker.cs" />
+    <Compile Include="SulfurInputCaretOverlay.cs" />
     <Compile Include="SulfurInputVisualState.cs" />
     <Compile Include="SulfurLocalization.cs" />
     <Compile Include="SulfurMessageKind.cs" />
@@ -96,9 +97,9 @@
     <Compile Include="SulfurOptionsStateExtensions.cs" />
     <Compile Include="SulfurPageStateStore.cs" />
     <Compile Include="SulfurReflection.cs" />
+    <Compile Include="SulfurSettingHandle.cs" />
     <Compile Include="SulfurSettingRow.cs" />
     <Compile Include="SulfurTextInputBinding.cs" />
-    <Compile Include="ulfurInputCaretOverlay.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
