@@ -9,7 +9,7 @@ namespace Ryuka.Sulfur.NativeUI
     {
         public const string PluginGuid = "ryuka.sulfur.nativeui";
         public const string PluginName = "SULFUR Native UI Lib";
-        public const string PluginVersion = "0.6.3";
+        public const string PluginVersion = "0.7.0";
 
         internal static ManualLogSource Log { get; private set; }
 

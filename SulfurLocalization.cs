@@ -41,6 +41,7 @@ namespace Ryuka.Sulfur.NativeUI
                 return;
 
             Dictionary<string, Dictionary<string, string>> pluginMap;
+
             if (!data.TryGetValue(pluginGuid, out pluginMap))
             {
                 pluginMap = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -61,16 +62,19 @@ namespace Ryuka.Sulfur.NativeUI
                 return fallback ?? "";
 
             Dictionary<string, Dictionary<string, string>> pluginMap;
+
             if (!data.TryGetValue(pluginGuid, out pluginMap))
                 return fallback ?? "";
 
             foreach (string langCode in GetLanguageFallbacks())
             {
                 Dictionary<string, string> langMap;
+
                 if (!pluginMap.TryGetValue(langCode, out langMap))
                     continue;
 
                 string value;
+
                 if (langMap.TryGetValue(key, out value))
                     return value ?? "";
             }
@@ -88,7 +92,11 @@ namespace Ryuka.Sulfur.NativeUI
             lastLanguageCheckUtc = now;
 
             string raw = GetCurrentGameLanguageName();
-            string code = MapGameLanguageToCode(raw);
+            string directCode = GetCurrentGameLanguageCode();
+            string code = NormalizeLanguageCode(directCode);
+
+            if (string.IsNullOrWhiteSpace(code))
+                code = MapGameLanguageToCode(raw);
 
             if (string.Equals(raw, cachedRawLanguage, StringComparison.Ordinal) &&
                 string.Equals(code, cachedLanguageCode, StringComparison.OrdinalIgnoreCase))
@@ -110,22 +118,27 @@ namespace Ryuka.Sulfur.NativeUI
             // Plugin.dll
             // lang/en.json
             string langDir = Path.Combine(pluginDir, "lang");
+
             if (Directory.Exists(langDir))
                 yield return langDir;
 
-            // Gale / mod manager flattened structure:
+            // Flattened structure:
             // Plugin.dll
             // en.json
             // zh-CN.json
+            //
+            // This is needed for SULFUR Config itself and some mod-manager packages.
             if (Directory.Exists(pluginDir))
                 yield return pluginDir;
 
             // Extra compatibility:
-            // Some managers may put dll in one folder but keep lang next to the package folder.
+            // Some managers may put DLL in one folder but keep lang next to the package folder.
             DirectoryInfo parent = Directory.GetParent(pluginDir);
+
             if (parent != null)
             {
                 string parentLangDir = Path.Combine(parent.FullName, "lang");
+
                 if (Directory.Exists(parentLangDir))
                     yield return parentLangDir;
             }
@@ -220,8 +233,9 @@ namespace Ryuka.Sulfur.NativeUI
             // Search order is:
             // 1. lang/
             // 2. plugin root
+            // 3. parent/lang/
             //
-            // So if lang/ already provided a key, root-level fallback should not override it.
+            // If an earlier directory already provided a key, later fallback directories should not override it.
             foreach (KeyValuePair<string, string> pair in newMap)
             {
                 if (string.IsNullOrWhiteSpace(pair.Key))
@@ -248,7 +262,10 @@ namespace Ryuka.Sulfur.NativeUI
             if (value.Equals("config", StringComparison.OrdinalIgnoreCase))
                 return false;
 
-            if (value.Length < 2 || value.Length > 16)
+            if (value.Equals("localization_manifest", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (value.Length < 2 || value.Length > 32)
                 return false;
 
             string normalized = value.Replace('_', '-');
@@ -308,10 +325,12 @@ namespace Ryuka.Sulfur.NativeUI
 
         private static Dictionary<string, string> LoadLangFile(string file)
         {
-            Dictionary<string, string> result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, string> result =
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             string json = File.ReadAllText(file, Encoding.UTF8);
-            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(SulfurLangFile));
+            DataContractJsonSerializer serializer =
+                new DataContractJsonSerializer(typeof(SulfurLangFile));
 
             using (MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
             {
@@ -341,6 +360,7 @@ namespace Ryuka.Sulfur.NativeUI
                 yield return current;
 
                 int dash = current.IndexOf('-');
+
                 if (dash > 0)
                     yield return current.Substring(0, dash);
             }
@@ -353,6 +373,7 @@ namespace Ryuka.Sulfur.NativeUI
             try
             {
                 Type localizationManagerType = FindTypeByFullName("I2.Loc.LocalizationManager");
+
                 if (localizationManagerType == null)
                     return "";
 
@@ -372,6 +393,53 @@ namespace Ryuka.Sulfur.NativeUI
             }
         }
 
+        private static string GetCurrentGameLanguageCode()
+        {
+            try
+            {
+                Type localizationManagerType = FindTypeByFullName("I2.Loc.LocalizationManager");
+
+                if (localizationManagerType == null)
+                    return "";
+
+                PropertyInfo prop = localizationManagerType.GetProperty(
+                    "CurrentLanguageCode",
+                    BindingFlags.Public | BindingFlags.Static);
+
+                if (prop == null)
+                    return "";
+
+                object value = prop.GetValue(null, null);
+                return value != null ? value.ToString() : "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private static string NormalizeLanguageCode(string code)
+        {
+            if (string.IsNullOrWhiteSpace(code))
+                return "";
+
+            string value = code.Trim().Replace('_', '-');
+
+            if (value.Equals("zh-cn", StringComparison.OrdinalIgnoreCase))
+                return "zh-CN";
+
+            if (value.Equals("zh-tw", StringComparison.OrdinalIgnoreCase))
+                return "zh-TW";
+
+            if (value.Equals("pt-br", StringComparison.OrdinalIgnoreCase))
+                return "pt-BR";
+
+            if (value.Equals("es-es", StringComparison.OrdinalIgnoreCase))
+                return "es-ES";
+
+            return value.ToLowerInvariant();
+        }
+
         private static string MapGameLanguageToCode(string gameLanguage)
         {
             if (string.IsNullOrWhiteSpace(gameLanguage))
@@ -385,25 +453,49 @@ namespace Ryuka.Sulfur.NativeUI
             if (value.Equals("Chinese (Traditional)", StringComparison.OrdinalIgnoreCase))
                 return "zh-TW";
 
+            if (value.Equals("English", StringComparison.OrdinalIgnoreCase))
+                return "en";
+
+            if (value.Equals("Swedish", StringComparison.OrdinalIgnoreCase))
+                return "sv";
+
+            if (value.Equals("French", StringComparison.OrdinalIgnoreCase))
+                return "fr";
+
+            if (value.Equals("Italian", StringComparison.OrdinalIgnoreCase))
+                return "it";
+
+            if (value.Equals("German", StringComparison.OrdinalIgnoreCase))
+                return "de";
+
+            if (value.Equals("Spanish", StringComparison.OrdinalIgnoreCase))
+                return "es";
+
+            if (value.Equals("Portuguese", StringComparison.OrdinalIgnoreCase))
+                return "pt";
+
+            if (value.Equals("Russian", StringComparison.OrdinalIgnoreCase))
+                return "ru";
+
+            if (value.Equals("Polish", StringComparison.OrdinalIgnoreCase))
+                return "pl";
+
             if (value.Equals("Japanese", StringComparison.OrdinalIgnoreCase))
                 return "ja";
 
-            if (value.Equals("English", StringComparison.OrdinalIgnoreCase))
-                return "en";
+            if (value.Equals("Korean", StringComparison.OrdinalIgnoreCase))
+                return "ko";
+
+            if (value.Equals("Turkish", StringComparison.OrdinalIgnoreCase))
+                return "tr";
+
+            if (value.Equals("Arabic", StringComparison.OrdinalIgnoreCase))
+                return "ar";
 
             if (value.Contains("简体") || value.Contains("简体中文") || value.Contains("简中"))
                 return "zh-CN";
 
             if (value.Contains("繁體") || value.Contains("繁体") || value.Contains("繁中"))
-                return "zh-TW";
-
-            if (value.Contains("日本語") || value.Contains("日本"))
-                return "ja";
-
-            if (value.IndexOf("Simplified", StringComparison.OrdinalIgnoreCase) >= 0)
-                return "zh-CN";
-
-            if (value.IndexOf("Traditional", StringComparison.OrdinalIgnoreCase) >= 0)
                 return "zh-TW";
 
             if (value.IndexOf("Chinese", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -422,6 +514,7 @@ namespace Ryuka.Sulfur.NativeUI
                 try
                 {
                     Type type = assembly.GetType(fullName);
+
                     if (type != null)
                         return type;
                 }
