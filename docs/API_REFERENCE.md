@@ -1,79 +1,91 @@
 # API Reference
 
-This document describes the public-facing API expected from SULFUR Native UI Lib v0.6.1.
-
 ## SulfurOptionsApi
 
 ### RegisterPage
 
-Registers a custom native Options page.
+Registers a custom page in the native Options screen.
 
 ```csharp
 SulfurOptionsApi.RegisterPage(new SulfurOptionsPage
 {
-    PageId = "my_page",
-    DisplayName = "My Page",
-    GetDisplayName = () => "My Page",
-    SortOrder = 100,
-    BuildPage = ctx =>
-    {
-        ctx.AddSection("General");
-    }
+    PageId = "ryuka.example.mod",
+    DisplayName = "Example Mod",
+    SortOrder = 1000,
+    GetDisplayName = () => "Example Mod",
+    BuildPage = BuildPage
 });
 ```
 
-### Page ID rules
+### UnregisterPage
 
-Use stable, lowercase IDs:
+Unregisters a page.
 
-```text
-mod_guid_or_short_name.section_name
+```csharp
+SulfurOptionsApi.UnregisterPage("ryuka.example.mod");
 ```
 
-Examples:
+Call this in `OnDestroy()`.
 
-```text
-ryuka.sulfur.config
-deadeye_instinct
-weapon_xp_multiplier
-```
-
-The `PageId` is used by the bridge and page-state store. Do not change it between versions unless you intentionally want to reset saved foldout state.
+---
 
 ## SulfurOptionsPage
 
-Common fields:
-
 ```csharp
-public string PageId;
-public string DisplayName;
-public Func<string> GetDisplayName;
-public int SortOrder;
-public Action<SulfurOptionsContext> BuildPage;
+public sealed class SulfurOptionsPage
+{
+    public string PageId;
+    public string DisplayName;
+    public int SortOrder;
+    public Func<string> GetDisplayName;
+    public Action<SulfurOptionsContext> BuildPage;
+}
 ```
 
-### DisplayName vs GetDisplayName
+### PageId
 
-Use `DisplayName` as a fallback.
+Stable unique id.
 
-Use `GetDisplayName` when localization is needed:
+Recommended format:
 
-```csharp
-GetDisplayName = () => L("page.name", "My Mod")
+```text
+author.game.mod
 ```
+
+Example:
+
+```text
+ryuka.sulfur.config
+```
+
+### DisplayName
+
+Fallback display name.
+
+### SortOrder
+
+Controls custom page ordering.
+
+### GetDisplayName
+
+Optional dynamic display name provider. Use this for localization.
+
+### BuildPage
+
+Called when the page is built or rebuilt.
+
+---
 
 ## SulfurOptionsContext
 
-`SulfurOptionsContext` is passed to `BuildPage`.
+A page builder context.
 
-It contains page-building methods and helpers.
-
-### Basic information
+### Important properties
 
 ```csharp
-ctx.PageId
-ctx.OptionsScreen
-ctx.OptionsContainer
+OptionsScreen OptionsScreen { get; }
+RectTransform OptionsContainer { get; }
+string PageId { get; }
 ```
 
 ### Rebuild
@@ -82,577 +94,290 @@ ctx.OptionsContainer
 ctx.Rebuild();
 ```
 
-Rebuilds the current custom page.
+Rebuilds the whole current custom page.
 
-The library preserves the current scroll position where possible.
+Do not use this for ordinary value changes. It is expensive.
 
-Avoid calling `Rebuild()` on every text input character. Prefer draft values and a separate `Apply Filter` button.
+Use only for:
 
-## Basic controls
-
-### Button
-
-```csharp
-ctx.AddButton("Refresh", () =>
-{
-    Refresh();
-});
-```
-
-With description:
-
-```csharp
-ctx.AddButton(
-    "Refresh",
-    "Reload current data.",
-    () => Refresh());
-```
-
-### Info
-
-```csharp
-ctx.AddInfo("Read-only text");
-```
-
-### Toggle
-
-```csharp
-ctx.AddToggle(
-    "Enable Feature",
-    "Enable or disable this feature.",
-    enabled,
-    value => enabled = value);
-```
-
-### Cycle
-
-```csharp
-ctx.AddCycle(
-    "Mode",
-    "Select operation mode.",
-    new[] { "Low", "Normal", "High" },
-    currentIndex,
-    (index, value) =>
-    {
-        currentIndex = index;
-    });
-```
-
-### Slider
-
-```csharp
-ctx.AddSlider(
-    "Multiplier",
-    "Adjust multiplier.",
-    value,
-    0f,
-    10f,
-    0.5f,
-    newValue => value = newValue);
-```
-
-## Text and number input
-
-### TextInput
-
-```csharp
-ctx.AddTextInput(
-    "Search",
-    "Type filter text.",
-    searchDraft,
-    value =>
-    {
-        searchDraft = value;
-        ctx.SetFooterStatus("Filter draft changed.");
-    });
-```
-
-Do not rebuild the page on every `onChanged` callback unless the field is not actively used for continuous typing.
-
-### NumberInput
-
-```csharp
-ctx.AddNumberInput(
-    "Spawn Multiplier",
-    "Range: 0.1 - 10.",
-    spawnMultiplier,
-    0.1f,
-    10f,
-    2,
-    value =>
-    {
-        spawnMultiplier = value;
-        ctx.SetFooterStatus("Value changed.");
-    });
-```
-
-Number input clamps the result on end edit.
-
-## Layout helpers
-
-### Section
-
-```csharp
-ctx.AddSection("General");
-```
-
-### Description
-
-```csharp
-ctx.AddDescription("This setting affects enemy spawning.");
-```
-
-### Spacer
-
-```csharp
-ctx.AddSpacer(18f);
-```
-
-### Read-only text
-
-```csharp
-ctx.AddReadonlyText("Status", "Ready");
-```
-
-## Footer
-
-The footer is only intended for custom pages. It should be hidden automatically when the user switches to native game categories.
+- filter changed
+- filter cleared
+- manual refresh
+- Apply / Save
+- major structure changes
 
 ### SetFooter
 
 ```csharp
 ctx.SetFooter(
-    leftText: "Dirty: 3 | Files: 2",
-    statusText: "Ready.",
+    leftText: "Entries: 164 | Pending: 0",
+    statusText: "Ready. Changes are not saved until you click Apply.",
     primaryButtonText: "Apply",
-    onPrimaryPressed: ApplyAllDirty);
+    onPrimaryPressed: Apply);
 ```
+
+Sets footer text and primary button.
 
 ### SetFooterStatus
 
 ```csharp
-ctx.SetFooterStatus("Applied.");
+ctx.SetFooterStatus("Pending change: EnableMod");
 ```
 
-### ClearFooter
+Updates only footer status text.
+
+Use this for light updates.
+
+---
+
+## Themed Groups
+
+### BeginThemedGroup
 
 ```csharp
-ctx.ClearFooter();
+using (ctx.BeginThemedGroup("section.content.General"))
+{
+    ctx.AddBadgeRow("Entries: 3", "Unchanged");
+    DrawEntry(ctx, entry1);
+    DrawEntry(ctx, entry2);
+}
 ```
 
-Use the footer for global actions such as:
+Creates a scoped section content group.
 
-- Apply all dirty changes
-- Save
-- Refresh
-- Run selected operation
+All rows created inside the scope are added to the themed group.
 
-For configuration pages, prefer a single footer `Apply` button instead of per-setting Apply buttons.
+Use this to visually show where a section's contents begin and end.
 
-## Messages
+---
 
-### AddMessage
+## Basic UI methods
+
+### AddSection
 
 ```csharp
-ctx.AddMessage("Information.", SulfurMessageKind.Info);
+ctx.AddSection("General");
 ```
+
+Adds a simple section header.
+
+### AddDescription
+
+```csharp
+ctx.AddDescription("Description text.");
+```
+
+Adds description text.
 
 ### AddWarning
 
 ```csharp
-ctx.AddWarning("This setting requires restart.");
+ctx.AddWarning("No config entries match the current filters.");
 ```
 
-### AddError
-
-```csharp
-ctx.AddError("Invalid number.");
-```
-
-### AddSuccess
-
-```csharp
-ctx.AddSuccess("Saved successfully.");
-```
-
-## Badges
+Adds warning text.
 
 ### AddBadgeRow
 
 ```csharp
-ctx.AddBadgeRow("Dirty", "Restart Required", "Advanced");
+ctx.AddBadgeRow("Entries: 3", "Pending: 1");
 ```
 
-Badge rows are purely visual.
-
-The library does not know what `Dirty`, `Restart Required`, or `Advanced` mean.
-
-## Small buttons
+Adds a compact row of badges.
 
 ### AddSmallButton
 
 ```csharp
-ctx.AddSmallButton("Default", () =>
+ctx.AddSmallButton("Refresh", () =>
 {
-    ResetToDefault();
+    needsScan = true;
     ctx.Rebuild();
 });
 ```
 
-Optional width overload:
+Adds a small native-style button row.
+
+### AddSpacer
 
 ```csharp
-ctx.AddSmallButton("Apply Filter", ApplyFilter, 120f);
+ctx.AddSpacer(12f);
 ```
 
-### AddDefaultButton
+Adds vertical spacing.
+
+---
+
+## Setting row APIs
+
+Old API:
 
 ```csharp
-ctx.AddDefaultButton(() =>
-{
-    ResetToDefault();
-});
+ctx.AddSettingToggle(row, value, onChanged);
+ctx.AddSettingText(row, value, onChanged);
+ctx.AddSettingNumber(row, value, min, max, decimals, onChanged);
+ctx.AddSettingCycle(row, values, currentIndex, onChanged);
 ```
 
-For configuration pages, use a per-setting `Default` button and a global footer `Apply`.
+These preserve compatibility but do not return a row handle.
 
-## Setting row helpers
-
-Added in v0.5.
-
-Setting rows combine a control with common metadata:
-
-- label
-- description
-- dirty/clean badge
-- live apply / restart required badge
-- advanced / hidden / dangerous badge
-- default button
-- optional message
-- indentation
-
-### SulfurSettingRow
+Recommended high-performance API:
 
 ```csharp
-new SulfurSettingRow
+ctx.AddSettingToggleEx(row, value, onChanged, out handle);
+ctx.AddSettingTextEx(row, value, onChanged, out handle);
+ctx.AddSettingNumberEx(row, value, min, max, decimals, onChanged, out handle);
+ctx.AddSettingCycleEx(row, values, currentIndex, onChanged, out handle);
+```
+
+Use the `Ex` methods for large pages and config editors.
+
+---
+
+## SulfurSettingRow
+
+```csharp
+public sealed class SulfurSettingRow
 {
-    Label = "SpawnMultiplier",
-    Description = "Enemy spawn multiplier.",
+    public string Label;
+    public string Description;
+
+    public int IndentLevel;
+    public float IndentPixels;
+
+    public bool IsDirty;
+    public bool ShowCleanBadge;
+
+    public bool RequiresRestart;
+    public bool LiveApply;
+    public bool Advanced;
+    public bool Hidden;
+    public bool Dangerous;
+
+    public string DirtyText;
+    public string CleanText;
+    public string RestartRequiredText;
+    public string LiveApplyText;
+    public string AdvancedText;
+    public string HiddenText;
+    public string DangerousText;
+
+    public string[] ExtraBadges;
+
+    public string Message;
+    public SulfurMessageKind MessageKind;
+
+    public bool ShowDefaultButton;
+    public string DefaultButtonText;
+    public Action OnDefault;
+}
+```
+
+Recommended defaults for config editors:
+
+```csharp
+SulfurSettingRow row = new SulfurSettingRow
+{
+    Label = entry.DisplayName,
+    Description = entry.Description,
     IndentLevel = 1,
-    IsDirty = true,
-    RequiresRestart = true,
-    Advanced = true,
+    IsDirty = entry.IsDirty,
+
+    RequiresRestart = entry.RequiresRestart,
+    LiveApply = entry.LiveApply,
+    Advanced = entry.Advanced,
+    Hidden = entry.Hidden,
+    Dangerous = entry.Dangerous,
+
+    DirtyText = "Pending",
+    CleanText = "Unchanged",
+    RestartRequiredText = "Restart Required",
+    LiveApplyText = "Live Apply",
+    AdvancedText = "Advanced",
+    HiddenText = "Hidden",
+    DangerousText = "Dangerous",
+
+    Message = entry.IsDirty ? pendingMessage : entry.RangeText,
+    MessageKind = entry.IsDirty ? SulfurMessageKind.Warning : SulfurMessageKind.Info,
+
     DefaultButtonText = "Default",
-    OnDefault = () => ResetToDefault()
-}
+    OnDefault = () => { ... }
+};
 ```
 
-Important fields:
+---
+
+## SulfurSettingHandle
+
+Runtime handle for updating one setting row without rebuilding the whole page.
+
+### SetDirty
 
 ```csharp
-public string Label;
-public string Description;
-
-public bool IsDirty;
-public bool RequiresRestart;
-public bool LiveApply;
-public bool Advanced;
-public bool Hidden;
-public bool Dangerous;
-
-public string[] ExtraBadges;
-
-public bool ShowCleanBadge = true;
-public bool ShowDefaultButton = true;
-public string DefaultButtonText = "Default";
-public Action OnDefault;
-
-public int IndentLevel = 0;
-public float IndentPixels = 28f;
-
-public string Message;
-public SulfurMessageKind MessageKind = SulfurMessageKind.Info;
+handle.SetDirty(true, "Pending", "Unchanged");
 ```
 
-### AddSettingToggle
+or:
 
 ```csharp
-ctx.AddSettingToggle(
-    new SulfurSettingRow
-    {
-        Label = "EnableAutoSpawn",
-        Description = "Enable automatic dynamic pressure spawning.",
-        IndentLevel = 1,
-        IsDirty = isDirty,
-        LiveApply = true,
-        OnDefault = () => ResetAutoSpawn()
-    },
-    enableAutoSpawn,
-    value =>
-    {
-        enableAutoSpawn = value;
-        ctx.Rebuild();
-    });
+handle.SetDirty(entry.IsDirty);
 ```
 
-### AddSettingText
+### SetMessage
 
 ```csharp
-ctx.AddSettingText(
-    new SulfurSettingRow
-    {
-        Label = "Search",
-        Description = "Filter entries.",
-        ShowDefaultButton = false
-    },
-    searchDraft,
-    value =>
-    {
-        searchDraft = value;
-    });
+handle.SetMessage(
+    "This setting has unsaved pending changes. Click Apply to write it to cfg.",
+    SulfurMessageKind.Warning);
 ```
 
-### AddSettingNumber
+### SetActive
 
 ```csharp
-ctx.AddSettingNumber(
-    new SulfurSettingRow
-    {
-        Label = "Multiplier",
-        Description = "Range: 0 - 100.",
-        IndentLevel = 1,
-        IsDirty = isDirty,
-        ExtraBadges = new[] { "Range: 0 - 100" },
-        OnDefault = () => multiplier = defaultMultiplier
-    },
-    multiplier,
-    0f,
-    100f,
-    2,
-    value =>
-    {
-        multiplier = value;
-        ctx.Rebuild();
-    });
+handle.SetActive(false);
 ```
 
-### AddSettingCycle
+---
+
+## SulfurMessageKind
 
 ```csharp
-ctx.AddSettingCycle(
-    new SulfurSettingRow
-    {
-        Label = "Mode",
-        Description = "Select mode.",
-        IndentLevel = 1,
-        IsDirty = isDirty
-    },
-    new[] { "Low", "Normal", "High" },
-    index,
-    (newIndex, value) =>
-    {
-        index = newIndex;
-        ctx.Rebuild();
-    });
-```
-
-### AddSettingEnum
-
-```csharp
-ctx.AddSettingEnum<MyEnum>(
-    row,
-    currentValue,
-    value =>
-    {
-        currentValue = value;
-    });
-```
-
-## Foldouts
-
-Added in v0.6.
-
-Foldout state is stored in the page-state store and survives page rebuilds.
-
-### AddFoldout
-
-```csharp
-bool expanded = ctx.AddFoldout(
-    key: "section.general",
-    label: "General",
-    defaultExpanded: true);
-
-if (expanded)
+public enum SulfurMessageKind
 {
-    // render section contents
+    Info,
+    Warning,
+    Error,
+    Success
 }
 ```
 
-### Force expanded
-
-Useful when search results match inside a collapsed group:
+Use:
 
 ```csharp
-bool expanded = ctx.AddFoldout(
-    "plugin.weapon_xp",
-    "Weapon XP Multiplier",
-    false,
-    forceExpanded: hasActiveSearch);
+SulfurMessageKind.Info
+SulfurMessageKind.Warning
+SulfurMessageKind.Error
+SulfurMessageKind.Success
 ```
 
-### Plugin foldout
+---
 
-```csharp
-bool expanded = ctx.AddPluginFoldout(
-    "plugin.deadeye",
-    "Deadeye Instinct",
-    true,
-    forceExpanded: hasActiveSearch);
-```
-
-### Section foldout
-
-```csharp
-bool expanded = ctx.AddSectionFoldout(
-    "plugin.deadeye.section.general",
-    "General",
-    true,
-    forceExpanded: hasActiveSearch);
-```
-
-### Foldout with badges
-
-```csharp
-bool expanded = ctx.AddFoldoutWithBadges(
-    "plugin.weapon_xp",
-    "Weapon XP Multiplier",
-    false,
-    hasActiveSearch,
-    "Plugin",
-    "Entries: 2",
-    "Clean");
-```
-
-## Page state
-
-Added in v0.6.
-
-Use page state for UI-only state:
-
-- foldout expanded/collapsed state
-- active filters
-- temporary mode toggles
-- selected subtab
-
-Do not use it for actual mod configuration values.
-
-### GetState / SetState
-
-```csharp
-string search = ctx.GetState("search.text", "");
-ctx.SetState("search.text", search);
-```
-
-### HasState
-
-```csharp
-if (ctx.HasState("foldout.general"))
-{
-    // state exists
-}
-```
-
-### RemoveState
-
-```csharp
-ctx.RemoveState("search.text");
-```
-
-### ClearPageState
-
-```csharp
-ctx.ClearPageState();
-```
-
-### ToggleBoolState
-
-```csharp
-bool expanded = ctx.ToggleBoolState("foldout.general", true);
-```
-
-## Localization
+## Localization API
 
 ### LoadPluginLocalization
 
 ```csharp
-SulfurLocalization.LoadPluginLocalization(
-    PluginGuid,
-    typeof(Plugin).Assembly.Location);
+SulfurLocalization.LoadPluginLocalization(pluginGuid, pluginInfo.Location);
 ```
+
+Loads `lang/*.json` beside the target plugin dll.
 
 ### Get
 
 ```csharp
-string text = SulfurLocalization.Get(
-    PluginGuid,
-    "setting.enable.name",
-    "Enable Feature");
+string label = SulfurLocalization.Get(
+    pluginGuid,
+    "entry.General.EnableMod.name",
+    "EnableMod");
 ```
 
-Recommended wrapper:
-
-```csharp
-private static string L(string key, string fallback)
-{
-    return SulfurLocalization.Get(PluginGuid, key, fallback);
-}
-```
-
-## Recommended config editor pattern
-
-```csharp
-ctx.SetFooter(
-    "Dirty: " + dirtyCount + " | Files: " + fileCount,
-    statusText,
-    "Apply",
-    () =>
-    {
-        ApplyAllDirty();
-        ctx.Rebuild();
-    });
-
-ctx.AddSection("SULFUR Config");
-
-ctx.AddTextInput(
-    "Filter",
-    "Type text, then click Apply Filter.",
-    filterDraft,
-    value => filterDraft = value);
-
-ctx.AddSmallButton("Apply Filter", () =>
-{
-    activeFilter = filterDraft;
-    ctx.Rebuild();
-});
-
-bool pluginExpanded = ctx.AddPluginFoldout(
-    "plugin.example",
-    "Example Mod",
-    true,
-    hasFilter);
-
-if (pluginExpanded)
-{
-    bool sectionExpanded = ctx.AddSectionFoldout(
-        "plugin.example.general",
-        "General",
-        true,
-        hasFilter);
-
-    if (sectionExpanded)
-    {
-        ctx.AddSettingToggle(...);
-        ctx.AddSettingNumber(...);
-    }
-}
-```
+Fallback is used when no translation exists.
