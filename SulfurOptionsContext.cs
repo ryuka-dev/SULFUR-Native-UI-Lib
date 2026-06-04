@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using PerfectRandom.Sulfur.Core;
@@ -19,9 +19,15 @@ namespace Ryuka.Sulfur.NativeUI
     public sealed class SulfurOptionsContext
     {
         private readonly OptionsScreen optionsScreen;
-        private readonly RectTransform optionsContainer;
+        private readonly RectTransform rootOptionsContainer;
+        private RectTransform currentOptionsContainer;
+        private readonly Stack<RectTransform> containerStack = new Stack<RectTransform>();
         private readonly List<OptionsScreenOption> nativeOptions;
         private readonly string pageId;
+
+        private TextMeshProUGUI sampleTextCache;
+        private bool sampleTextCacheInitialized;
+        private float nativeOptionWidthCache = -1f;
 
         internal SulfurOptionsContext(
             OptionsScreen optionsScreen,
@@ -30,7 +36,8 @@ namespace Ryuka.Sulfur.NativeUI
             string pageId)
         {
             this.optionsScreen = optionsScreen;
-            this.optionsContainer = optionsContainer;
+            this.rootOptionsContainer = optionsContainer;
+            this.currentOptionsContainer = optionsContainer;
             this.nativeOptions = nativeOptions;
             this.pageId = pageId;
         }
@@ -42,7 +49,7 @@ namespace Ryuka.Sulfur.NativeUI
 
         public RectTransform OptionsContainer
         {
-            get { return optionsContainer; }
+            get { return currentOptionsContainer ?? rootOptionsContainer; }
         }
 
         public string PageId
@@ -72,6 +79,264 @@ namespace Ryuka.Sulfur.NativeUI
         public void SetFooterStatus(string statusText)
         {
             SulfurOptionsScreenBridge.SetCustomPageFooterStatus(optionsScreen, statusText);
+        }
+
+        public IDisposable BeginThemedGroup(string name)
+        {
+            TextMeshProUGUI sample = FindSampleText();
+            Color color = sample != null
+                ? sample.color
+                : new Color(1f, 0.65f, 0.15f, 1f);
+
+            return BeginThemedGroup(name, color, 32f);
+        }
+
+        //public IDisposable BeginThemedGroup(string name, Color themeColor, float indentPixels)
+        //{
+        //    RectTransform parent = OptionsContainer;
+        //    if (parent == null)
+        //        return new SulfurContainerScope(this, null, false);
+
+        //    float leftInset = indentPixels;
+        //    float rightInset = 6f;
+
+        //    GameObject group = new GameObject(
+        //        string.IsNullOrWhiteSpace(name) ? "SULFUR_ThemedGroup" : name,
+        //        typeof(RectTransform),
+        //        typeof(CanvasRenderer),
+        //        typeof(Image),
+        //        typeof(VerticalLayoutGroup),
+        //        typeof(ContentSizeFitter));
+
+        //    group.transform.SetParent(parent, false);
+
+        //    RectTransform rt = group.GetComponent<RectTransform>();
+        //    rt.anchorMin = new Vector2(0f, 1f);
+        //    rt.anchorMax = new Vector2(1f, 1f);
+        //    rt.pivot = new Vector2(0.5f, 1f);
+        //    rt.anchoredPosition = Vector2.zero;
+        //    rt.offsetMin = new Vector2(leftInset, 0f);
+        //    rt.offsetMax = new Vector2(-rightInset, 0f);
+
+        //    Image image = group.GetComponent<Image>();
+        //    image.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.018f);
+        //    image.raycastTarget = false;
+
+        //    VerticalLayoutGroup layout = group.GetComponent<VerticalLayoutGroup>();
+        //    layout.padding = new RectOffset(18, 14, 10, 12);
+        //    layout.spacing = 6f;
+        //    layout.childAlignment = TextAnchor.UpperLeft;
+        //    layout.childControlWidth = true;
+        //    layout.childControlHeight = false;
+        //    layout.childForceExpandWidth = true;
+        //    layout.childForceExpandHeight = false;
+
+        //    ContentSizeFitter fitter = group.GetComponent<ContentSizeFitter>();
+        //    fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        //    fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        //    Color borderColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.68f);
+
+        //    //CreateBorderLine(group.transform, "BorderLeft", borderColor,
+        //    //    new Vector2(0f, 0f), new Vector2(0f, 1f),
+        //    //    new Vector2(0f, 0f), new Vector2(2f, 0f));
+
+        //    //CreateBorderLine(group.transform, "BorderRight", borderColor,
+        //    //    new Vector2(1f, 0f), new Vector2(1f, 1f),
+        //    //    new Vector2(-2f, 0f), new Vector2(0f, 0f));
+
+        //    //CreateBorderLine(group.transform, "BorderTop", borderColor,
+        //    //    new Vector2(0f, 1f), new Vector2(1f, 1f),
+        //    //    new Vector2(0f, -2f), new Vector2(0f, 0f));
+
+        //    //CreateBorderLine(group.transform, "BorderBottom", borderColor,
+        //    //    new Vector2(0f, 0f), new Vector2(1f, 0f),
+        //    //    new Vector2(0f, 0f), new Vector2(0f, 2f));
+
+        //    containerStack.Push(currentOptionsContainer);
+        //    currentOptionsContainer = rt;
+
+        //    return new SulfurContainerScope(this, rt, true);
+        //}
+
+        public IDisposable BeginThemedGroup(string name, Color themeColor, float indentPixels)
+        {
+            RectTransform parent = OptionsContainer;
+            if (parent == null)
+                return new SulfurContainerScope(this, null, false);
+
+            float width = Mathf.Max(360f, GetNativeOptionWidth() - indentPixels + 24f);
+
+            GameObject group = new GameObject(
+                string.IsNullOrWhiteSpace(name) ? "SULFUR_ThemedGroup" : name,
+                typeof(RectTransform),
+                typeof(LayoutElement),
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(VerticalLayoutGroup),
+                typeof(ContentSizeFitter));
+
+            group.transform.SetParent(parent, false);
+
+            RectTransform rt = group.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.anchoredPosition = new Vector2(indentPixels, 0f);
+            rt.sizeDelta = new Vector2(width, 0f);
+
+            LayoutElement groupLayout = group.GetComponent<LayoutElement>();
+            groupLayout.minWidth = width;
+            groupLayout.preferredWidth = width;
+            groupLayout.flexibleWidth = 0f;
+
+            // 背景只给极淡透明，不要让整个区域变黄
+            Image image = group.GetComponent<Image>();
+            image.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.004f);
+            image.raycastTarget = false;
+
+            VerticalLayoutGroup layout = group.GetComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(18, 14, 10, 12);
+            layout.spacing = 6f;
+            layout.childAlignment = TextAnchor.UpperLeft;
+            layout.childControlWidth = true;
+            layout.childControlHeight = false;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+
+            ContentSizeFitter fitter = group.GetComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            Color borderColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.75f);
+
+            GameObject overlay = CreateBorderOverlay(group.transform, borderColor);
+            overlay.name = "BorderOverlay";
+
+            containerStack.Push(currentOptionsContainer);
+            currentOptionsContainer = rt;
+
+            return new SulfurContainerScope(this, rt, true);
+        }
+
+        private void EndThemedGroup()
+        {
+            if (containerStack.Count > 0)
+                currentOptionsContainer = containerStack.Pop();
+            else
+                currentOptionsContainer = rootOptionsContainer;
+        }
+
+        private static void CreateBorderLine(
+            Transform parent,
+            string name,
+            Color color,
+            Vector2 anchorMin,
+            Vector2 anchorMax,
+            Vector2 offsetMin,
+            Vector2 offsetMax)
+        {
+            GameObject line = new GameObject(
+                name,
+                typeof(RectTransform),
+                typeof(LayoutElement),
+                typeof(CanvasRenderer),
+                typeof(Image));
+
+            line.transform.SetParent(parent, false);
+
+            RectTransform rt = line.GetComponent<RectTransform>();
+            rt.anchorMin = anchorMin;
+            rt.anchorMax = anchorMax;
+            rt.offsetMin = offsetMin;
+            rt.offsetMax = offsetMax;
+
+            LayoutElement layout = line.GetComponent<LayoutElement>();
+            layout.ignoreLayout = true;
+
+            Image image = line.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+        }
+
+        private static GameObject CreateBorderOverlay(Transform parent, Color borderColor)
+        {
+            GameObject overlay = new GameObject(
+                "BorderOverlay",
+                typeof(RectTransform),
+                typeof(LayoutElement));
+
+            overlay.transform.SetParent(parent, false);
+
+            RectTransform overlayRt = overlay.GetComponent<RectTransform>();
+            overlayRt.anchorMin = Vector2.zero;
+            overlayRt.anchorMax = Vector2.one;
+            overlayRt.offsetMin = Vector2.zero;
+            overlayRt.offsetMax = Vector2.zero;
+
+            LayoutElement overlayLayout = overlay.GetComponent<LayoutElement>();
+            overlayLayout.ignoreLayout = true;
+
+            CreateBorderLine(overlay.transform, "BorderLeft", borderColor,
+                new Vector2(0f, 0f), new Vector2(0f, 1f),
+                new Vector2(2f, 0f), new Vector2(6f, 0f));
+
+            CreateBorderLine(overlay.transform, "BorderRight", borderColor,
+                new Vector2(1f, 0f), new Vector2(1f, 1f),
+                new Vector2(-6f, 0f), new Vector2(-2f, 0f));
+
+            CreateBorderLine(overlay.transform, "BorderTop", borderColor,
+                new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(2f, -3f), new Vector2(-2f, -1f));
+
+            CreateBorderLine(overlay.transform, "BorderBottom", borderColor,
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(2f, 1f), new Vector2(-2f, 3f));
+
+            return overlay;
+        }
+
+        private sealed class SulfurContainerScope : IDisposable
+        {
+            private readonly SulfurOptionsContext context;
+            private readonly RectTransform groupRoot;
+            private readonly bool active;
+            private bool disposed;
+
+            public SulfurContainerScope(SulfurOptionsContext context, RectTransform groupRoot, bool active)
+            {
+                this.context = context;
+                this.groupRoot = groupRoot;
+                this.active = active;
+            }
+
+            public void Dispose()
+            {
+                if (disposed)
+                    return;
+
+                disposed = true;
+
+                BringBordersToFront(groupRoot);
+
+                if (active && context != null)
+                    context.EndThemedGroup();
+            }
+
+            private static void BringBordersToFront(RectTransform root)
+            {
+                if (root == null)
+                    return;
+
+                MoveLast(root, "BorderOverlay");
+            }
+
+            private static void MoveLast(Transform root, string childName)
+            {
+                Transform child = root.Find(childName);
+                if (child != null)
+                    child.SetAsLastSibling();
+            }
         }
 
         public void ClearFooter()
@@ -272,7 +537,7 @@ namespace Ryuka.Sulfur.NativeUI
     TMP_InputField.ContentType contentType)
         {
             GameObject row = new GameObject(name, typeof(RectTransform), typeof(LayoutElement), typeof(CanvasRenderer), typeof(Image));
-            row.transform.SetParent(optionsContainer, false);
+            row.transform.SetParent(OptionsContainer, false);
 
             RectTransform rowRt = row.GetComponent<RectTransform>();
             ApplyNativeRowRect(rowRt, 48f);
@@ -378,17 +643,26 @@ namespace Ryuka.Sulfur.NativeUI
             return input;
         }
 
-        private TextMeshProUGUI FindSampleText()
+        internal TextMeshProUGUI FindSampleText()
         {
-            if (optionsContainer == null)
+            if (sampleTextCacheInitialized)
+                return sampleTextCache;
+
+            sampleTextCacheInitialized = true;
+            sampleTextCache = null;
+
+            if (OptionsContainer == null)
                 return null;
 
-            TextMeshProUGUI[] texts = optionsContainer.GetComponentsInChildren<TextMeshProUGUI>(true);
+            TextMeshProUGUI[] texts = OptionsContainer.GetComponentsInChildren<TextMeshProUGUI>(true);
 
             foreach (TextMeshProUGUI text in texts)
             {
                 if (text != null && text.font != null)
-                    return text;
+                {
+                    sampleTextCache = text;
+                    return sampleTextCache;
+                }
             }
 
             return null;
@@ -406,25 +680,35 @@ namespace Ryuka.Sulfur.NativeUI
             rectTransform.sizeDelta = new Vector2(GetNativeOptionWidth(), height);
         }
 
-        private float GetNativeOptionWidth()
+        internal float GetNativeOptionWidth()
         {
+            if (nativeOptionWidthCache > 100f)
+                return nativeOptionWidthCache;
+
             GameObject prefab = SulfurOptionsScreenBridge.GetOptionButtonPrefab(optionsScreen);
 
             if (prefab != null)
             {
                 RectTransform rt = prefab.GetComponent<RectTransform>();
                 if (rt != null && rt.sizeDelta.x > 100f)
-                    return rt.sizeDelta.x;
+                {
+                    nativeOptionWidthCache = rt.sizeDelta.x;
+                    return nativeOptionWidthCache;
+                }
             }
 
-            if (optionsContainer != null)
+            if (OptionsContainer != null)
             {
-                RectTransform containerRt = optionsContainer.GetComponent<RectTransform>();
+                RectTransform containerRt = OptionsContainer.GetComponent<RectTransform>();
                 if (containerRt != null && containerRt.rect.width > 100f)
-                    return containerRt.rect.width;
+                {
+                    nativeOptionWidthCache = containerRt.rect.width;
+                    return nativeOptionWidthCache;
+                }
             }
 
-            return 900f;
+            nativeOptionWidthCache = 900f;
+            return nativeOptionWidthCache;
         }
 
         private static bool TryParseNumber(string text, out float value)
@@ -462,7 +746,7 @@ namespace Ryuka.Sulfur.NativeUI
                 typeof(RectTransform),
                 typeof(LayoutElement));
 
-            row.transform.SetParent(optionsContainer, false);
+            row.transform.SetParent(OptionsContainer, false);
 
             RectTransform rowRt = row.GetComponent<RectTransform>();
             ApplyNativeRowRect(rowRt, 54f);
@@ -542,7 +826,7 @@ namespace Ryuka.Sulfur.NativeUI
                 return null;
 
             GameObject row = new GameObject("Description", typeof(RectTransform), typeof(LayoutElement));
-            row.transform.SetParent(optionsContainer, false);
+            row.transform.SetParent(OptionsContainer, false);
 
             RectTransform rowRt = row.GetComponent<RectTransform>();
             ApplyNativeRowRect(rowRt, 42f);
@@ -608,14 +892,14 @@ namespace Ryuka.Sulfur.NativeUI
                 return;
 
             GameObject row = new GameObject("SULFUR_Message_" + kind, typeof(RectTransform), typeof(LayoutElement), typeof(CanvasRenderer), typeof(Image));
-            row.transform.SetParent(optionsContainer, false);
+            row.transform.SetParent(OptionsContainer, false);
 
             RectTransform rowRt = row.GetComponent<RectTransform>();
-            ApplyNativeRowRect(rowRt, 46f);
+            ApplyNativeRowRect(rowRt, 40f);
 
             LayoutElement layout = row.GetComponent<LayoutElement>();
-            layout.minHeight = 46f;
-            layout.preferredHeight = 46f;
+            layout.minHeight = 40f;
+            layout.preferredHeight = 40f;
             layout.minWidth = GetNativeOptionWidth();
             layout.preferredWidth = GetNativeOptionWidth();
 
@@ -643,7 +927,7 @@ namespace Ryuka.Sulfur.NativeUI
             if (sample != null)
             {
                 label.font = sample.font;
-                label.fontSize = Mathf.Max(15f, sample.fontSize * 0.76f);
+                label.fontSize = Mathf.Max(13f, sample.fontSize * 0.66f);
                 label.color = new Color(sample.color.r, sample.color.g, sample.color.b, 0.9f);
             }
             else
@@ -674,14 +958,14 @@ namespace Ryuka.Sulfur.NativeUI
                 return;
 
             GameObject row = new GameObject("SULFUR_BadgeRow", typeof(RectTransform), typeof(LayoutElement), typeof(HorizontalLayoutGroup));
-            row.transform.SetParent(optionsContainer, false);
+            row.transform.SetParent(OptionsContainer, false);
 
             RectTransform rowRt = row.GetComponent<RectTransform>();
-            ApplyNativeRowRect(rowRt, 36f);
+            ApplyNativeRowRect(rowRt, 30f);
 
             LayoutElement layout = row.GetComponent<LayoutElement>();
-            layout.minHeight = 36f;
-            layout.preferredHeight = 36f;
+            layout.minHeight = 30f;
+            layout.preferredHeight = 30f;
             layout.minWidth = GetNativeOptionWidth();
             layout.preferredWidth = GetNativeOptionWidth();
 
@@ -717,7 +1001,7 @@ namespace Ryuka.Sulfur.NativeUI
             float buttonWidth = minWidth > 0f ? minWidth : CalculateSmallButtonWidth(safeLabel);
 
             GameObject row = new GameObject("SULFUR_SmallButtonRow", typeof(RectTransform), typeof(LayoutElement), typeof(HorizontalLayoutGroup));
-            row.transform.SetParent(optionsContainer, false);
+            row.transform.SetParent(OptionsContainer, false);
 
             RectTransform rowRt = row.GetComponent<RectTransform>();
             ApplyNativeRowRect(rowRt, 42f);
@@ -769,7 +1053,7 @@ namespace Ryuka.Sulfur.NativeUI
         public void AddSpacer(float height = 20f)
         {
             GameObject spacer = new GameObject("SULFUR_Spacer", typeof(RectTransform), typeof(LayoutElement));
-            spacer.transform.SetParent(optionsContainer, false);
+            spacer.transform.SetParent(OptionsContainer, false);
 
             LayoutElement layout = spacer.GetComponent<LayoutElement>();
             layout.minHeight = Mathf.Max(0f, height);
@@ -1013,12 +1297,32 @@ namespace Ryuka.Sulfur.NativeUI
             return tmp;
         }
 
+        internal IEnumerable<Transform> GetChildrenFrom(int startIndex)
+        {
+            if (OptionsContainer == null)
+                yield break;
+
+            int start = Mathf.Clamp(startIndex, 0, OptionsContainer.childCount);
+
+            for (int i = start; i < OptionsContainer.childCount; i++)
+            {
+                Transform child = OptionsContainer.GetChild(i);
+                if (child != null)
+                    yield return child;
+            }
+        }
+
+        internal int GetChildCount()
+        {
+            return OptionsContainer != null ? OptionsContainer.childCount : 0;
+        }
+
         private OptionsScreenOption InstantiateOption(GameObject prefab)
         {
             if (prefab == null)
                 throw new InvalidOperationException("Option prefab is null.");
 
-            GameObject go = UnityEngine.Object.Instantiate(prefab, optionsContainer);
+            GameObject go = UnityEngine.Object.Instantiate(prefab, OptionsContainer);
             go.SetActive(true);
 
             OptionsScreenOption option = go.GetComponent<OptionsScreenOption>();
@@ -1148,7 +1452,7 @@ namespace Ryuka.Sulfur.NativeUI
             if (sample != null)
             {
                 label.font = sample.font;
-                label.fontSize = Mathf.Max(13f, sample.fontSize * 0.62f);
+                label.fontSize = Mathf.Max(11f, sample.fontSize * 0.52f);
                 label.color = new Color(sample.color.r, sample.color.g, sample.color.b, 0.82f);
             }
             else
@@ -1218,7 +1522,7 @@ namespace Ryuka.Sulfur.NativeUI
             {
                 text.font = sample.font;
                 text.fontSharedMaterial = sample.fontSharedMaterial;
-                text.fontSize = Mathf.Max(15f, sample.fontSize * 0.72f);
+                text.fontSize = Mathf.Max(13f, sample.fontSize * 0.62f);
                 text.color = sample.color;
             }
             else

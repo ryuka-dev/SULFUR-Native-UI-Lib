@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using TMPro;
 using PerfectRandom.Sulfur.Core;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,9 +9,9 @@ using UnityEngine.UI;
 namespace Ryuka.Sulfur.NativeUI
 {
     /// <summary>
-    /// v0.6.1 setting-row convenience API.
-    /// This is intentionally implemented as extension methods so existing v0.4 SulfurOptionsContext
-    /// does not need to be rewritten.
+    /// Setting-row convenience API.
+    /// The non-Ex methods preserve the original API.
+    /// The Ex methods return a SulfurSettingHandle so callers can update one row without ctx.Rebuild().
     /// </summary>
     public static class SulfurOptionsSettingRows
     {
@@ -19,19 +21,12 @@ namespace Ryuka.Sulfur.NativeUI
             bool value,
             Action<bool> onChanged)
         {
-            row = Normalize(row);
-            int start = GetChildCount(ctx);
-
-            OptionsScreenOption option = ctx.AddToggle(
-                row.Label,
-                row.Description,
-                value,
-                onChanged);
-
-            AddSettingMeta(ctx, row);
-            ApplyIndentToNewChildren(ctx, start, row);
-
-            return option;
+            SulfurSettingHandle ignored;
+            return AddSettingToggleEx(ctx, row, value, delegate(bool v, SulfurSettingHandle h)
+            {
+                if (onChanged != null)
+                    onChanged(v);
+            }, out ignored);
         }
 
         public static OptionsScreenOption AddSettingText(
@@ -40,19 +35,12 @@ namespace Ryuka.Sulfur.NativeUI
             string value,
             Action<string> onChanged)
         {
-            row = Normalize(row);
-            int start = GetChildCount(ctx);
-
-            OptionsScreenOption option = ctx.AddTextInput(
-                row.Label,
-                row.Description,
-                value,
-                onChanged);
-
-            AddSettingMeta(ctx, row);
-            ApplyIndentToNewChildren(ctx, start, row);
-
-            return option;
+            SulfurSettingHandle ignored;
+            return AddSettingTextEx(ctx, row, value, delegate(string v, SulfurSettingHandle h)
+            {
+                if (onChanged != null)
+                    onChanged(v);
+            }, out ignored);
         }
 
         public static OptionsScreenOption AddSettingNumber(
@@ -64,22 +52,12 @@ namespace Ryuka.Sulfur.NativeUI
             int decimals,
             Action<float> onChanged)
         {
-            row = Normalize(row);
-            int start = GetChildCount(ctx);
-
-            OptionsScreenOption option = ctx.AddNumberInput(
-                row.Label,
-                row.Description,
-                value,
-                min,
-                max,
-                decimals,
-                onChanged);
-
-            AddSettingMeta(ctx, row);
-            ApplyIndentToNewChildren(ctx, start, row);
-
-            return option;
+            SulfurSettingHandle ignored;
+            return AddSettingNumberEx(ctx, row, value, min, max, decimals, delegate(float v, SulfurSettingHandle h)
+            {
+                if (onChanged != null)
+                    onChanged(v);
+            }, out ignored);
         }
 
         public static OptionsScreenOption AddSettingCycle(
@@ -89,20 +67,12 @@ namespace Ryuka.Sulfur.NativeUI
             int currentIndex,
             Action<int, string> onChanged)
         {
-            row = Normalize(row);
-            int start = GetChildCount(ctx);
-
-            OptionsScreenOption option = ctx.AddCycle(
-                row.Label,
-                row.Description,
-                values,
-                currentIndex,
-                onChanged);
-
-            AddSettingMeta(ctx, row);
-            ApplyIndentToNewChildren(ctx, start, row);
-
-            return option;
+            SulfurSettingHandle ignored;
+            return AddSettingCycleEx(ctx, row, values, currentIndex, delegate(int i, string v, SulfurSettingHandle h)
+            {
+                if (onChanged != null)
+                    onChanged(i, v);
+            }, out ignored);
         }
 
         public static OptionsScreenOption AddSettingEnum<TEnum>(
@@ -133,6 +103,130 @@ namespace Ryuka.Sulfur.NativeUI
                     {
                     }
                 });
+        }
+
+        public static OptionsScreenOption AddSettingToggleEx(
+            this SulfurOptionsContext ctx,
+            SulfurSettingRow row,
+            bool value,
+            Action<bool, SulfurSettingHandle> onChanged,
+            out SulfurSettingHandle handle)
+        {
+            row = Normalize(row);
+            int start = GetChildCount(ctx);
+            SulfurSettingHandle localHandle = null;
+
+            OptionsScreenOption option = ctx.AddToggle(
+                row.Label,
+                row.Description,
+                value,
+                delegate(bool v)
+                {
+                    if (onChanged != null)
+                        onChanged(v, localHandle);
+                });
+
+            AddSettingMeta(ctx, row);
+            ApplyIndentToNewChildren(ctx, start, row);
+
+            localHandle = CreateHandle(ctx, start, row);
+            handle = localHandle;
+            return option;
+        }
+
+        public static OptionsScreenOption AddSettingTextEx(
+            this SulfurOptionsContext ctx,
+            SulfurSettingRow row,
+            string value,
+            Action<string, SulfurSettingHandle> onChanged,
+            out SulfurSettingHandle handle)
+        {
+            row = Normalize(row);
+            int start = GetChildCount(ctx);
+            SulfurSettingHandle localHandle = null;
+
+            OptionsScreenOption option = ctx.AddTextInput(
+                row.Label,
+                row.Description,
+                value,
+                delegate(string v)
+                {
+                    if (onChanged != null)
+                        onChanged(v, localHandle);
+                });
+
+            AddSettingMeta(ctx, row);
+            ApplyIndentToNewChildren(ctx, start, row);
+
+            localHandle = CreateHandle(ctx, start, row);
+            handle = localHandle;
+            return option;
+        }
+
+        public static OptionsScreenOption AddSettingNumberEx(
+            this SulfurOptionsContext ctx,
+            SulfurSettingRow row,
+            float value,
+            float min,
+            float max,
+            int decimals,
+            Action<float, SulfurSettingHandle> onChanged,
+            out SulfurSettingHandle handle)
+        {
+            row = Normalize(row);
+            int start = GetChildCount(ctx);
+            SulfurSettingHandle localHandle = null;
+
+            OptionsScreenOption option = ctx.AddNumberInput(
+                row.Label,
+                row.Description,
+                value,
+                min,
+                max,
+                decimals,
+                delegate(float v)
+                {
+                    if (onChanged != null)
+                        onChanged(v, localHandle);
+                });
+
+            AddSettingMeta(ctx, row);
+            ApplyIndentToNewChildren(ctx, start, row);
+
+            localHandle = CreateHandle(ctx, start, row);
+            handle = localHandle;
+            return option;
+        }
+
+        public static OptionsScreenOption AddSettingCycleEx(
+            this SulfurOptionsContext ctx,
+            SulfurSettingRow row,
+            IReadOnlyList<string> values,
+            int currentIndex,
+            Action<int, string, SulfurSettingHandle> onChanged,
+            out SulfurSettingHandle handle)
+        {
+            row = Normalize(row);
+            int start = GetChildCount(ctx);
+            SulfurSettingHandle localHandle = null;
+
+            OptionsScreenOption option = ctx.AddCycle(
+                row.Label,
+                row.Description,
+                values,
+                currentIndex,
+                delegate(int i, string v)
+                {
+                    if (onChanged != null)
+                        onChanged(i, v, localHandle);
+                });
+
+            AddSettingMeta(ctx, row);
+            ApplyIndentToNewChildren(ctx, start, row);
+
+            localHandle = CreateHandle(ctx, start, row);
+            handle = localHandle;
+            return option;
         }
 
         public static void AddSettingMeta(
@@ -195,6 +289,17 @@ namespace Ryuka.Sulfur.NativeUI
             return badges;
         }
 
+        private static SulfurSettingHandle CreateHandle(
+            SulfurOptionsContext ctx,
+            int startIndex,
+            SulfurSettingRow row)
+        {
+            if (ctx == null)
+                return new SulfurSettingHandle(row, null);
+
+            return new SulfurSettingHandle(row, ctx.GetChildrenFrom(startIndex).ToList());
+        }
+
         private static SulfurSettingRow Normalize(SulfurSettingRow row)
         {
             if (row == null)
@@ -225,10 +330,10 @@ namespace Ryuka.Sulfur.NativeUI
 
         private static int GetChildCount(SulfurOptionsContext ctx)
         {
-            if (ctx == null || ctx.OptionsContainer == null)
+            if (ctx == null)
                 return 0;
 
-            return ctx.OptionsContainer.childCount;
+            return ctx.GetChildCount();
         }
 
         private static void ApplyIndentToNewChildren(
@@ -271,6 +376,88 @@ namespace Ryuka.Sulfur.NativeUI
                     if (layout.preferredWidth > indent + 120f)
                         layout.preferredWidth -= indent;
                 }
+
+                ApplyCompactSettingChildStyle(child);
+            }
+        }
+
+        private static void ApplyCompactSettingChildStyle(Transform child)
+        {
+            if (child == null)
+                return;
+
+            string name = child.name ?? "";
+            TextMeshProUGUI[] texts = child.GetComponentsInChildren<TextMeshProUGUI>(true);
+            if (texts == null || texts.Length == 0)
+                return;
+
+            bool isBadge = name == "SULFUR_BadgeRow";
+            bool isMessage = name.StartsWith("SULFUR_Message_");
+            bool isDescription = name == "Description";
+            bool isSmallButton = name == "SULFUR_SmallButtonRow";
+            bool isOption = child.GetComponent<OptionsScreenOption>() != null;
+
+            foreach (TextMeshProUGUI text in texts)
+            {
+                if (text == null)
+                    continue;
+
+                text.enableAutoSizing = false;
+                text.textWrappingMode = isDescription || isMessage
+                    ? TextWrappingModes.Normal
+                    : TextWrappingModes.NoWrap;
+
+                if (isOption)
+                {
+                    // Setting item title/value should be visibly smaller than section and mod foldouts.
+                    text.fontSize = Mathf.Clamp(text.fontSize * 0.82f, 15f, 18f);
+                    text.fontStyle = FontStyles.Normal;
+                }
+                else if (isDescription)
+                {
+                    text.fontSize = Mathf.Clamp(text.fontSize * 0.88f, 12f, 15f);
+                }
+                else if (isBadge)
+                {
+                    text.fontSize = Mathf.Clamp(text.fontSize * 0.82f, 11f, 13f);
+                }
+                else if (isMessage)
+                {
+                    text.fontSize = Mathf.Clamp(text.fontSize * 0.88f, 12f, 15f);
+                }
+                else if (isSmallButton)
+                {
+                    text.fontSize = Mathf.Clamp(text.fontSize * 0.84f, 12f, 14f);
+                }
+            }
+
+            RectTransform rt = child as RectTransform;
+            if (rt == null)
+                rt = child.GetComponent<RectTransform>();
+
+            LayoutElement layout = child.GetComponent<LayoutElement>();
+
+            if (isBadge)
+                SetRowHeight(rt, layout, 28f);
+            else if (isMessage)
+                SetRowHeight(rt, layout, 38f);
+            else if (isDescription)
+                SetRowHeight(rt, layout, 34f);
+            else if (isSmallButton)
+                SetRowHeight(rt, layout, 36f);
+            else if (isOption)
+                SetRowHeight(rt, layout, 50f);
+        }
+
+        private static void SetRowHeight(RectTransform rt, LayoutElement layout, float height)
+        {
+            if (rt != null)
+                rt.sizeDelta = new Vector2(rt.sizeDelta.x, height);
+
+            if (layout != null)
+            {
+                layout.minHeight = height;
+                layout.preferredHeight = height;
             }
         }
     }

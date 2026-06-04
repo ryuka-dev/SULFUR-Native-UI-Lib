@@ -1,4 +1,4 @@
-﻿using BepInEx;
+using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
 
@@ -9,7 +9,7 @@ namespace Ryuka.Sulfur.NativeUI
     {
         public const string PluginGuid = "ryuka.sulfur.nativeui";
         public const string PluginName = "SULFUR Native UI Lib";
-        public const string PluginVersion = "0.5.0";
+        public const string PluginVersion = "0.6.3";
 
         internal static ManualLogSource Log { get; private set; }
 

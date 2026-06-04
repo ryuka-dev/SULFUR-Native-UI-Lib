@@ -169,9 +169,9 @@ namespace Ryuka.Sulfur.NativeUI
             if (parent == null)
                 return;
 
-            float width = GetRowWidth(parent);
-            float height = style == SulfurFoldoutStyle.Plugin ? 58f : 42f;
-            float rowIndent = style == SulfurFoldoutStyle.Plugin ? 0f : 26f;
+            float width = ctx.GetNativeOptionWidth();
+            float height = style == SulfurFoldoutStyle.Plugin ? 66f : 48f;
+            float rowIndent = style == SulfurFoldoutStyle.Plugin ? 0f : 32f;
             float rowWidth = Mathf.Max(200f, width - rowIndent);
 
             GameObject row = new GameObject(
@@ -198,7 +198,7 @@ namespace Ryuka.Sulfur.NativeUI
             layout.preferredWidth = rowWidth;
             layout.flexibleWidth = 0f;
 
-            TextMeshProUGUI sample = FindSampleText(parent);
+            TextMeshProUGUI sample = ctx.FindSampleText();
             Color baseColor = sample != null ? sample.color : new Color(1f, 0.65f, 0.15f, 1f);
 
             Image background = row.GetComponent<Image>();
@@ -266,59 +266,99 @@ namespace Ryuka.Sulfur.NativeUI
             TextMeshProUGUI sample,
             Color baseColor)
         {
-            GameObject textObject = new GameObject(
-                "FoldoutText",
+            float left;
+
+            if (style == SulfurFoldoutStyle.Plugin)
+                left = 26f;
+            else if (style == SulfurFoldoutStyle.Section)
+                left = 32f;
+            else
+                left = 28f;
+
+            float arrowWidth = 34f;
+
+            GameObject arrowObject = new GameObject(
+                "FoldoutArrow",
                 typeof(RectTransform),
                 typeof(CanvasRenderer),
                 typeof(TextMeshProUGUI));
 
-            textObject.transform.SetParent(parent, false);
+            arrowObject.transform.SetParent(parent, false);
 
-            RectTransform rt = textObject.GetComponent<RectTransform>();
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
+            RectTransform arrowRt = arrowObject.GetComponent<RectTransform>();
+            arrowRt.anchorMin = new Vector2(0f, 0f);
+            arrowRt.anchorMax = new Vector2(0f, 1f);
+            arrowRt.pivot = new Vector2(0f, 0.5f);
+            arrowRt.offsetMin = new Vector2(left, 0f);
+            arrowRt.offsetMax = new Vector2(left + arrowWidth, 0f);
 
-            if (style == SulfurFoldoutStyle.Plugin)
-                rt.offsetMin = new Vector2(22f, 0f);
-            else if (style == SulfurFoldoutStyle.Section)
-                rt.offsetMin = new Vector2(34f, 0f);
-            else
-                rt.offsetMin = new Vector2(28f, 0f);
+            TextMeshProUGUI arrow = arrowObject.GetComponent<TextMeshProUGUI>();
+            arrow.text = expanded ? "▼" : ">";
+            arrow.alignment = TextAlignmentOptions.Center;
+            arrow.raycastTarget = false;
+            arrow.textWrappingMode = TextWrappingModes.NoWrap;
+            arrow.overflowMode = TextOverflowModes.Overflow;
 
-            rt.offsetMax = style == SulfurFoldoutStyle.Plugin
+            GameObject labelObject = new GameObject(
+                "FoldoutLabel",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+
+            labelObject.transform.SetParent(parent, false);
+
+            RectTransform labelRt = labelObject.GetComponent<RectTransform>();
+            labelRt.anchorMin = Vector2.zero;
+            labelRt.anchorMax = Vector2.one;
+            labelRt.offsetMin = new Vector2(left + arrowWidth + 6f, 0f);
+            labelRt.offsetMax = style == SulfurFoldoutStyle.Plugin
                 ? new Vector2(-110f, 0f)
                 : new Vector2(-24f, 0f);
 
-            TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
-            text.text = (expanded ? "▼  " : "▶  ") + (label ?? "");
-            text.alignment = TextAlignmentOptions.MidlineLeft;
+            TextMeshProUGUI text = labelObject.GetComponent<TextMeshProUGUI>();
+            text.text = label ?? "";
+            text.alignment = TextAlignmentOptions.Left;
             text.raycastTarget = false;
             text.textWrappingMode = TextWrappingModes.NoWrap;
             text.overflowMode = TextOverflowModes.Ellipsis;
 
+            float fontSize;
+
             if (sample != null)
             {
+                arrow.font = sample.font;
+                arrow.fontSharedMaterial = sample.fontSharedMaterial;
+
                 text.font = sample.font;
                 text.fontSharedMaterial = sample.fontSharedMaterial;
 
                 if (style == SulfurFoldoutStyle.Plugin)
-                    text.fontSize = Mathf.Max(21f, sample.fontSize * 1.08f);
+                    fontSize = Mathf.Max(25f, sample.fontSize * 1.22f);
                 else if (style == SulfurFoldoutStyle.Section)
-                    text.fontSize = Mathf.Max(17f, sample.fontSize * 0.86f);
+                    fontSize = Mathf.Max(20f, sample.fontSize * 1.00f);
                 else
-                    text.fontSize = sample.fontSize;
+                    fontSize = sample.fontSize;
 
-                text.color = style == SulfurFoldoutStyle.Section
-                    ? new Color(baseColor.r, baseColor.g, baseColor.b, 0.82f)
+                Color textColor = style == SulfurFoldoutStyle.Section
+                    ? new Color(baseColor.r, baseColor.g, baseColor.b, 0.86f)
                     : baseColor;
+
+                arrow.color = textColor;
+                text.color = textColor;
             }
             else
             {
-                text.fontSize = style == SulfurFoldoutStyle.Plugin ? 22f : 17f;
+                fontSize = style == SulfurFoldoutStyle.Plugin ? 26f : 20f;
+
+                arrow.color = baseColor;
                 text.color = baseColor;
             }
 
-            text.fontStyle = style == SulfurFoldoutStyle.Plugin ? FontStyles.Bold : FontStyles.Normal;
+            arrow.fontSize = fontSize;
+            text.fontSize = fontSize;
+
+            arrow.fontStyle = FontStyles.Bold;
+            text.fontStyle = style == SulfurFoldoutStyle.Group ? FontStyles.Normal : FontStyles.Bold;
         }
 
         private static void CreateRightTag(
@@ -354,7 +394,7 @@ namespace Ryuka.Sulfur.NativeUI
             {
                 text.font = sample.font;
                 text.fontSharedMaterial = sample.fontSharedMaterial;
-                text.fontSize = Mathf.Max(13f, sample.fontSize * 0.62f);
+                text.fontSize = Mathf.Max(12f, sample.fontSize * 0.55f);
                 text.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.62f);
             }
             else
