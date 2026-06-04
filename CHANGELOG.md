@@ -1,104 +1,55 @@
 # Changelog
 
-## 0.6.1
+## 0.6.3 Development Standard
 
-UI polish pass.
+Focus:
 
-- Improved plugin foldout visual hierarchy.
-- Improved section foldout visual hierarchy.
-- Added setting row indentation support.
-- Improved small button width handling.
-- Improved footer text layout to reduce truncation.
-- Improved config-editor-like visual structure:
-  - Plugin
-  - Section
-  - Setting
+- large custom Options pages
+- config editor performance
+- row handle updates
+- themed section groups
+- foldout hierarchy styling
 
-## 0.6.0
+### Added
 
-Added page state and foldout support.
+- `SulfurSettingHandle`
+- `AddSettingToggleEx`
+- `AddSettingTextEx`
+- `AddSettingNumberEx`
+- `AddSettingCycleEx`
+- `BeginThemedGroup(...)`
+- current/root container switching for scoped groups
+- sample text cache
+- native option width cache
+- themed group documentation standard
 
-- Added `SulfurPageStateStore`.
-- Added `ctx.GetState<T>()`.
-- Added `ctx.SetState<T>()`.
-- Added `ctx.HasState()`.
-- Added `ctx.RemoveState()`.
-- Added `ctx.ClearPageState()`.
-- Added `ctx.ToggleBoolState()`.
-- Added `ctx.AddFoldout()`.
-- Added `ctx.AddFoldoutWithBadges()`.
-- Added plugin and section foldout patterns.
-- Updated test plugin to simulate multiple mods and sections.
+### Changed
 
-## 0.5.0
+- Config editors should not rebuild on ordinary edits.
+- Foldouts should use ASCII arrows `>` and `v`.
+- Themed group borders should use `BorderOverlay`, not Unity `Outline`.
+- Plugin and section foldouts should be visually larger than setting rows.
+- Section contents should be visually grouped with a border.
 
-Added setting row abstraction.
+### Compatibility
 
-- Added `SulfurSettingRow`.
-- Added `ctx.AddSettingToggle()`.
-- Added `ctx.AddSettingText()`.
-- Added `ctx.AddSettingNumber()`.
-- Added `ctx.AddSettingCycle()`.
-- Added `ctx.AddSettingEnum()`.
-- Added setting row metadata rendering:
-  - Dirty / Clean
-  - Restart Required
-  - Live Apply
-  - Advanced
-  - Hidden
-  - Dangerous
-  - ExtraBadges
-  - Default button
-  - Optional message
+Old APIs remain valid:
 
-## 0.4.0
+```csharp
+AddSettingToggle(...)
+AddSettingText(...)
+AddSettingNumber(...)
+AddSettingCycle(...)
+```
 
-Changed direction toward configuration editor support.
+For performance-sensitive pages, use the `Ex` APIs.
 
-- Added fixed footer bar for custom pages.
-- Added footer status text.
-- Added global primary footer button.
-- Added `AddWarning`.
-- Added `AddError`.
-- Added `AddSuccess`.
-- Added `AddMessage`.
-- Added `AddBadgeRow`.
-- Added `AddSmallButton`.
-- Added `AddDefaultButton`.
-- Improved input field behavior.
-- Added focus highlight support.
-- Updated test plugin to simulate global Apply + per-entry Default.
+---
 
-## 0.3.0
+## Known implementation notes
 
-Added input controls.
-
-- Added semi-native `TextInput`.
-- Added semi-native `NumberInput`.
-- Added `TMP_InputField` support.
-- Added visible caret overlay.
-- Added Backspace/cancel handling.
-- Added page `Rebuild()`.
-- Added section/description/spacer/read-only helpers.
-- Fixed input conflict with OptionsScreen cancel behavior.
-
-## 0.2.0
-
-Localization and native category stabilization.
-
-- Added plugin-localization loading from `lang/*.json`.
-- Added language fallback handling.
-- Added custom category label repair to avoid enum numeric labels such as `9007`.
-- Reduced log spam from language polling.
-- Improved custom category injection.
-
-## 0.1.0
-
-Initial proof of concept.
-
-- Injected a custom page into SULFUR OptionsScreen.
-- Added native button support.
-- Added native toggle support.
-- Added native cycle support.
-- Added native slider support.
-- Added basic test plugin.
+- Avoid Unicode arrow glyphs because SULFUR fonts may not include them.
+- Avoid `TextAlignmentOptions.MidlineCenter`; use `Center`.
+- Avoid `TextAlignmentOptions.MidlineLeft`; use `Left`.
+- Avoid stretch anchors for themed groups if they disappear in native layout.
+- Avoid Unity `Outline` for group borders.
