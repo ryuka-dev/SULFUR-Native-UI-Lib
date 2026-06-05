@@ -123,12 +123,11 @@ namespace Ryuka.Sulfur.NativeUI
                 if (categoryPrefab == null || categoryMenu == null || categoryObjects == null)
                     return;
 
+                RemoveExistingCustomCategories(categoryMenu.transform, categoryObjects);
+
                 foreach (SulfurOptionsPage page in pages)
                 {
                     if (page == null || string.IsNullOrWhiteSpace(page.PageId))
-                        continue;
-
-                    if (HasCategoryMarker(categoryMenu.transform, page.PageId))
                         continue;
 
                     GameObject go = UnityEngine.Object.Instantiate(categoryPrefab, categoryMenu.transform);
@@ -812,6 +811,31 @@ namespace Ryuka.Sulfur.NativeUI
             }
 
             return false;
+        }
+
+        private static void RemoveExistingCustomCategories(
+            Transform categoryMenu,
+            List<OptionsScreenCategory> categoryObjects)
+        {
+            if (categoryMenu == null)
+                return;
+
+            SulfurCustomCategoryMarker[] markers =
+                categoryMenu.GetComponentsInChildren<SulfurCustomCategoryMarker>(true);
+
+            foreach (SulfurCustomCategoryMarker marker in markers)
+            {
+                if (marker == null)
+                    continue;
+
+                OptionsScreenCategory category =
+                    marker.GetComponent<OptionsScreenCategory>();
+
+                if (category != null && categoryObjects != null)
+                    categoryObjects.Remove(category);
+
+                UnityEngine.Object.Destroy(marker.gameObject);
+            }
         }
 
         private static void DestroyChildren(Transform parent)

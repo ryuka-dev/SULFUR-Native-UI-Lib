@@ -92,8 +92,7 @@ namespace Ryuka.Sulfur.NativeUI
 
         private void CacheLabels()
         {
-            if (labels == null || labels.Length == 0)
-                labels = GetComponentsInChildren<TextMeshProUGUI>(true);
+            labels = GetComponentsInChildren<TextMeshProUGUI>(true);
         }
     }
 }
