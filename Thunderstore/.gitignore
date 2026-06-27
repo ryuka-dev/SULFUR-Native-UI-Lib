@@ -1,0 +1,6 @@
+# Build output copied here for packaging — do not commit the binary.
+*.dll
+*.pdb
+
+# Built Thunderstore package archives.
+*.zip

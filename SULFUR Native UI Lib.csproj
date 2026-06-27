@@ -29,6 +29,8 @@
     <!-- Profile the built plugin is deployed into after a successful build. -->
     <DeployProfile Condition=" '$(DeployProfile)' == '' ">复现bug</DeployProfile>
     <DeployDir Condition=" '$(DeployDir)' == '' ">$(GaleProfilesDir)\$(DeployProfile)\BepInEx\plugins\ryuka_labs-SULFUR_Native_UI_Lib</DeployDir>
+    <!-- Thunderstore packaging folder; the built dll is copied here for upload. -->
+    <ThunderstoreDir Condition=" '$(ThunderstoreDir)' == '' ">$(MSBuildProjectDirectory)\Thunderstore</ThunderstoreDir>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -128,5 +130,9 @@
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DeployDir)" SkipUnchangedFiles="false" />
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(DeployDir)" SkipUnchangedFiles="false" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
     <Message Importance="high" Text="Deployed $(TargetFileName) -> $(DeployDir)" />
+    <!-- Also drop the dll into the Thunderstore packaging folder (gitignored). -->
+    <MakeDir Directories="$(ThunderstoreDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ThunderstoreDir)" SkipUnchangedFiles="false" />
+    <Message Importance="high" Text="Deployed $(TargetFileName) -> $(ThunderstoreDir)" />
   </Target>
 </Project>

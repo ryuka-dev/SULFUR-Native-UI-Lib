@@ -1,0 +1,102 @@
+# SULFUR Native UI Lib
+
+A native Options screen UI library for SULFUR BepInEx mods.
+
+This library allows other modders to register custom pages inside the game's native Options screen and build native-style UI for mod configuration, debug panels, help pages, and other in-game tools.
+
+## Features
+
+- Native Options screen page registration
+- Custom Options categories
+- Foldout sections
+- Native-style setting rows
+- Toggle, text, number, and cycle controls
+- Themed section groups
+- Footer/status controls
+- Localization helpers
+- High-performance row updates for large config pages
+
+## For Players
+
+This is a library mod.
+
+It usually does nothing by itself. Install it only if another mod requires it.
+
+## For Mod Developers
+
+Source code and full documentation are available on GitHub:
+
+https://github.com/ryuka-dev/SULFUR-Native-UI-Lib
+
+The GitHub documentation is the latest source of truth for API usage, examples, performance rules, themed groups, localization, and config editor patterns.
+
+## Installation
+
+Install this mod with BepInEx.
+
+Place the DLL under:
+
+```text
+BepInEx/plugins/SULFURNativeUILib/
+```
+
+Recommended structure:
+
+```text
+BepInEx/plugins/SULFURNativeUILib/
+└─ SULFUR Native UI Lib.dll
+```
+
+## Requirements
+
+* SULFUR
+* BepInEx 5
+
+## Source Code
+
+The source code is available here:
+
+[https://github.com/ryuka-dev/SULFUR-Native-UI-Lib](https://github.com/ryuka-dev/SULFUR-Native-UI-Lib)
+
+The repository contains only original library source code and documentation. It does not include SULFUR game files, Unity assemblies, BepInEx binaries, paid assets, or decompiled game source.
+
+## Notes
+
+This is a developer library. End users only need it when another mod lists it as a dependency.
+
+
+# Changelog
+
+## 0.6.1
+
+- Added custom Options page registration.
+- Added basic native-style row creation helpers.
+- Added localization helper support.
+
+## 0.6.2
+
+- Added `SulfurSettingHandle`.
+- Added high-performance `AddSettingToggleEx`, `AddSettingTextEx`, `AddSettingNumberEx`, and `AddSettingCycleEx`.
+- Cached sample text and native option width per page context.
+- Preserved existing `AddSettingToggle`, `AddSettingText`, `AddSettingNumber`, and `AddSettingCycle` APIs.
+
+## 0.6.3
+
+- Added themed section group documentation standard.
+- Added guidance for large config editor pages.
+- Improved foldout hierarchy styling standard.
+- Added row-handle based update pattern for high-performance UI updates.
+- Documented that normal value edits should not rebuild the whole page.
+- Documented ASCII foldout arrows for TMP font compatibility.
+- Documented themed group border behavior and Unity Outline pitfalls.
+
+## 0.7.1
+Fixed
+- Fixed an issue where custom Native UI pages could disappear every second time the Options menu was opened.
+- Custom option categories are now rebuilt more safely when the game Options screen is opened again.
+- Improved custom category cleanup to avoid stale category buttons, invalid category references, or mismatched OptionsScreen state.
+- Improved custom category label refreshing so labels remain valid after the game UI is rebuilt or re-enabled.
+
+Changed
+- Native UI custom categories are now recreated after OptionsScreen setup instead of relying on old injected category objects.
+- This should make custom pages more stable when closing and reopening the Options menu with ESC.
