@@ -205,3 +205,20 @@ Recommended Chinese:
 ```
 
 Do not use overly long footer button labels when space is limited.
+
+## Custom rows are blank boxes in non-English languages
+
+Symptom: badges, descriptions, section headers, and text/number input rows show
+empty boxes (or only punctuation like `: 19`) when the game language is Chinese,
+Japanese, Korean, Russian, etc., while native option rows (toggles, cycles) and
+plain ASCII text render fine.
+
+Cause: these custom rows take their font from `FindSampleText()`. The game swaps
+the TextMeshPro font *asset* per language, but the option *prefabs* keep the
+default Latin asset, which has no glyphs for those scripts.
+
+Fixed in 0.7.3: `FindSampleText` takes the font *size* from the prefab (stable,
+so it does not compound on `Rebuild()`) but the font *asset and material* from
+the game's live, language-localized chrome. If you maintain a fork, do not
+sample both size and font from the prefab — sample the font from a live native
+text element outside the options container.

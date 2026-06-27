@@ -814,37 +814,82 @@ namespace Ryuka.Sulfur.NativeUI
                 return sampleTextCache;
 
             sampleTextCacheInitialized = true;
-            sampleTextCache = null;
+            sampleTextCache = ResolveSampleText();
+            return sampleTextCache;
+        }
 
-            // Sample the native style (font/size/color) from an option prefab first.
-            // The prefab is a stable asset and is never restyled, so its font size is
-            // always the true native base. Scanning the container instead is unsafe:
-            // on Rebuild(), the previous build's custom rows are still present this
-            // frame (Object.Destroy is deferred) and have already been shrunk by the
-            // compact styling, so using them as the base makes fonts shrink on every
-            // rebuild. See SulfurOptionsScreenBridge.BuildCustomPage / DestroyChildren.
+        private TextMeshProUGUI ResolveSampleText()
+        {
+            // Stable base for size/color: sample from an option prefab. The prefab is
+            // never restyled, so its font size is always the true native base. Scanning
+            // the container for size is unsafe: on Rebuild(), the previous build's custom
+            // rows are still present this frame (Object.Destroy is deferred) and have
+            // already been shrunk by the compact styling, so using them as the base makes
+            // fonts shrink on every rebuild. See SulfurOptionsScreenBridge.BuildCustomPage.
             TextMeshProUGUI prefabSample = FindPrefabSampleText();
-            if (prefabSample != null)
-            {
-                sampleTextCache = prefabSample;
-                return sampleTextCache;
-            }
 
-            if (OptionsContainer == null)
+            // Language font: the option prefab keeps the game's default (Latin) font
+            // asset, so non-English glyphs (CJK, Cyrillic, ...) are missing and custom
+            // rows render as blank boxes. The game applies a per-language font asset +
+            // material to its own live, localized chrome (category tabs, headers). Sample
+            // that so custom rows follow the active language instead of the prefab font.
+            TextMeshProUGUI liveLanguageSample = FindLiveLanguageText();
+
+            if (prefabSample == null)
+                return liveLanguageSample;
+
+            if (liveLanguageSample == null || liveLanguageSample.font == prefabSample.font)
+                return prefabSample;
+
+            // Prefab and live text use different font assets (the game swapped fonts for
+            // the current language). Combine the prefab's stable size/color with the live
+            // language font/material into a single detached sample, so every call site can
+            // keep reading one component and gets both correct size and correct glyphs.
+            return BuildLanguageSample(prefabSample, liveLanguageSample);
+        }
+
+        private TextMeshProUGUI FindLiveLanguageText()
+        {
+            if (optionsScreen == null)
                 return null;
 
-            TextMeshProUGUI[] texts = OptionsContainer.GetComponentsInChildren<TextMeshProUGUI>(true);
+            TextMeshProUGUI[] texts = optionsScreen.GetComponentsInChildren<TextMeshProUGUI>(true);
+            if (texts == null)
+                return null;
+
+            RectTransform container = OptionsContainer;
 
             foreach (TextMeshProUGUI text in texts)
             {
-                if (text != null && text.font != null)
-                {
-                    sampleTextCache = text;
-                    return sampleTextCache;
-                }
+                if (text == null || text.font == null)
+                    continue;
+
+                // Skip our own custom rows (inside the options container). Only the game's
+                // native chrome is reliably localized to the current language font.
+                if (container != null && text.transform.IsChildOf(container))
+                    continue;
+
+                return text;
             }
 
             return null;
+        }
+
+        private TextMeshProUGUI BuildLanguageSample(TextMeshProUGUI sizeSource, TextMeshProUGUI fontSource)
+        {
+            // Detached, inactive holder: never laid out or rendered, destroyed with the
+            // page on the next rebuild. It only carries style values for the call sites.
+            GameObject go = new GameObject("SulfurStyleSample", typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(OptionsContainer, false);
+            go.SetActive(false);
+
+            TextMeshProUGUI tmp = go.GetComponent<TextMeshProUGUI>();
+            tmp.font = fontSource.font;
+            tmp.fontSharedMaterial = fontSource.fontSharedMaterial;
+            tmp.fontSize = sizeSource.fontSize;
+            tmp.color = sizeSource.color;
+
+            return tmp;
         }
 
         private TextMeshProUGUI FindPrefabSampleText()
