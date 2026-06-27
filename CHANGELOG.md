@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.3
+
+### Fixed
+
+- Custom rows (badges, descriptions, section headers, text/number inputs)
+  rendered as blank boxes in non-English languages (CJK, Cyrillic, ...). The
+  0.7.2 font-shrink fix sampled the font from a stable option prefab, but the
+  prefab keeps the game's default Latin font asset, which lacks those glyphs.
+  `FindSampleText` now takes the font *size* from the prefab (still stable, no
+  compounding) but the font *asset and material* from the game's live,
+  language-localized chrome, so custom rows follow the active language.
+
 ## 0.7.2
 
 ### Added

@@ -111,3 +111,7 @@ Added
 
 Fixed
 - Fixed text and option font sizes shrinking a little every time a page refreshed (for example on each edit in a config editor), until the Options screen was reopened.
+
+## 0.7.3
+Fixed
+- Fixed custom rows (badges, descriptions, section headers, text/number inputs) showing as blank boxes in non-English languages such as Chinese, Japanese, Korean, and Russian. They now use the game's current language font instead of the default Latin font.
