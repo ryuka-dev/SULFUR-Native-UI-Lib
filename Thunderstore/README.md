@@ -90,6 +90,10 @@ This is a developer library. End users only need it when another mod lists it as
 - Documented ASCII foldout arrows for TMP font compatibility.
 - Documented themed group border behavior and Unity Outline pitfalls.
 
+## 0.7.0
+
+- Reworked localization loading: searches multiple folders for language files, auto-detects language files by name, merges entries from several sources, and follows the current game language.
+
 ## 0.7.1
 Fixed
 - Fixed an issue where custom Native UI pages could disappear every second time the Options menu was opened.
@@ -100,3 +104,10 @@ Fixed
 Changed
 - Native UI custom categories are now recreated after OptionsScreen setup instead of relying on old injected category objects.
 - This should make custom pages more stable when closing and reopening the Options menu with ESC.
+
+## 0.7.2
+Added
+- New inline input rows for mod developers (`AddInlineTextInput` / `AddInlineNumberInput`): the label and input field sit on the same line, matching the vanilla Options layout, with optional password masking.
+
+Fixed
+- Fixed text and option font sizes shrinking a little every time a page refreshed (for example on each edit in a config editor), until the Options screen was reopened.
