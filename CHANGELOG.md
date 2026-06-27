@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.7.1
+
+### Fixed
+
+- Custom Options categories were re-injected without removing the previous
+  ones, which could leave duplicate category buttons after the Options menu
+  was set up again. The bridge now removes existing custom categories (tracked
+  by `SulfurCustomCategoryMarker`) before re-injecting them.
+
+### Changed
+
+- Category cleanup is driven by the `SulfurCustomCategoryMarker` component
+  instead of skipping injection when a marker already exists.
+
+---
+
+## 0.7.0
+
+### Added
+
+- Localization overhaul in `SulfurLocalization`:
+  - multi-directory localization file search per plugin
+  - automatic detection of language files by name (`en`, `ja`, `zh-CN`, ...)
+  - merging of language maps loaded from multiple sources
+  - current game language detection through reflection
+  - language code normalization
+
+---
+
 ## 0.6.3 Development Standard
 
 Focus:

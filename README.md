@@ -4,7 +4,7 @@ Native OptionsScreen integration library for SULFUR BepInEx mods.
 
 This library lets external BepInEx mods register custom pages inside the game's native Options screen and build UI using the game's existing OptionsScreen style.
 
-Current target version: `0.6.3+`
+Current target version: `0.7.1+`
 
 The current development standard focuses on large custom Options pages, especially in-game config editor pages. The main design rule is:
 
@@ -112,6 +112,7 @@ BepInEx/plugins/YourMod/
 
 ## Documentation index
 
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md)
 - [`docs/PERFORMANCE_GUIDE.md`](docs/PERFORMANCE_GUIDE.md)
 - [`docs/THEMED_GROUPS.md`](docs/THEMED_GROUPS.md)
@@ -120,4 +121,5 @@ BepInEx/plugins/YourMod/
 - [`docs/CONFIG_EDITOR_PATTERN.md`](docs/CONFIG_EDITOR_PATTERN.md)
 - [`docs/EXAMPLES.md`](docs/EXAMPLES.md)
 - [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
-- [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
+- [`docs/DEVELOPMENT_NOTES.md`](docs/DEVELOPMENT_NOTES.md)
+- [`CHANGELOG.md`](CHANGELOG.md)
