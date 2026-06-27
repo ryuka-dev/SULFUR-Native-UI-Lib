@@ -651,6 +651,20 @@ namespace Ryuka.Sulfur.NativeUI
             sampleTextCacheInitialized = true;
             sampleTextCache = null;
 
+            // Sample the native style (font/size/color) from an option prefab first.
+            // The prefab is a stable asset and is never restyled, so its font size is
+            // always the true native base. Scanning the container instead is unsafe:
+            // on Rebuild(), the previous build's custom rows are still present this
+            // frame (Object.Destroy is deferred) and have already been shrunk by the
+            // compact styling, so using them as the base makes fonts shrink on every
+            // rebuild. See SulfurOptionsScreenBridge.BuildCustomPage / DestroyChildren.
+            TextMeshProUGUI prefabSample = FindPrefabSampleText();
+            if (prefabSample != null)
+            {
+                sampleTextCache = prefabSample;
+                return sampleTextCache;
+            }
+
             if (OptionsContainer == null)
                 return null;
 
@@ -662,6 +676,35 @@ namespace Ryuka.Sulfur.NativeUI
                 {
                     sampleTextCache = text;
                     return sampleTextCache;
+                }
+            }
+
+            return null;
+        }
+
+        private TextMeshProUGUI FindPrefabSampleText()
+        {
+            if (optionsScreen == null)
+                return null;
+
+            GameObject[] prefabs =
+            {
+                SulfurOptionsScreenBridge.GetOptionButtonPrefab(optionsScreen),
+                SulfurOptionsScreenBridge.GetOptionInfoPrefab(optionsScreen),
+                SulfurOptionsScreenBridge.GetOptionBoolPrefab(optionsScreen),
+                SulfurOptionsScreenBridge.GetOptionAlternativePrefab(optionsScreen)
+            };
+
+            foreach (GameObject prefab in prefabs)
+            {
+                if (prefab == null)
+                    continue;
+
+                TextMeshProUGUI[] texts = prefab.GetComponentsInChildren<TextMeshProUGUI>(true);
+                foreach (TextMeshProUGUI text in texts)
+                {
+                    if (text != null && text.font != null)
+                        return text;
                 }
             }
 
