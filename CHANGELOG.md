@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `AddInlineTextInput` and `AddInlineNumberInput` on `SulfurOptionsContext`:
+  inline rows where the label and input share one line (vanilla Options
+  layout). Pass the same `labelWidth` to align several inputs at the same
+  horizontal position. `AddInlineTextInput` supports `password: true` for a
+  masked field. Additive — the stacked `AddTextInput` / `AddNumberInput`
+  helpers are unchanged.
+
+### Fixed
+
+- Font size shrank one step on every `ctx.Rebuild()` (e.g. each value edit in
+  a config editor) until it hit a floor, resetting only when the Options screen
+  was reopened. `FindSampleText` based the native style on the first text in
+  the container, but on rebuild that was the previous build's already-shrunk
+  rows (`Object.Destroy` is deferred). It now samples a stable option prefab.
+
 ## 0.7.1
 
 ### Fixed

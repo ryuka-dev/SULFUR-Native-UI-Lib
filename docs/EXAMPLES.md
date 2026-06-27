@@ -151,3 +151,33 @@ private void DrawEntry(SulfurOptionsContext ctx, ConfigEntryModel entry)
         out handle);
 }
 ```
+
+---
+
+## Example 6: Aligned inline inputs (vanilla-style layout)
+
+```csharp
+private string host = "localhost";
+private string port = "38281";
+private string slot = "Father";
+private string password = "";
+private float timeout = 10f;
+
+private void BuildPage(SulfurOptionsContext ctx)
+{
+    ctx.AddSection("Archipelago");
+    ctx.AddDescription("Archipelago connection options.");
+
+    // Same labelWidth => every input box starts at the same x position.
+    ctx.AddInlineTextInput("Hostname", host, v => host = v);
+    ctx.AddInlineTextInput("Port",     port, v => port = v);
+    ctx.AddInlineTextInput("Slot",     slot, v => slot = v);
+    ctx.AddInlineTextInput("Password", password, v => password = v, password: true);
+
+    ctx.AddInlineNumberInput("Timeout", timeout, 0f, 60f, 1, v => timeout = v);
+}
+```
+
+Use `AddInlineTextInput` / `AddInlineNumberInput` when you want the label and
+input on one line. The stacked `AddTextInput` / `AddNumberInput` helpers are
+unchanged, so existing pages keep their current layout.

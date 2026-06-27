@@ -207,6 +207,59 @@ Adds vertical spacing.
 
 ---
 
+## Text and number inputs
+
+### Stacked inputs (label above input)
+
+```csharp
+ctx.AddTextInput("Hostname", host, value => host = value);
+ctx.AddNumberInput("Port", port, 0f, 65535f, 0, value => port = value);
+```
+
+The label is placed on its own row above a full-width input box. This is the
+original layout and is unchanged.
+
+### Inline inputs (label and input on the same line)
+
+```csharp
+TMP_InputField AddInlineTextInput(
+    string label,
+    string value,
+    Action<string> onChanged,
+    float labelWidth = 160f,
+    bool password = false);
+
+TMP_InputField AddInlineNumberInput(
+    string label,
+    float value,
+    float min,
+    float max,
+    int decimals,
+    Action<float> onChanged,
+    float labelWidth = 160f);
+```
+
+Places the label and the input field on a single row, matching the vanilla
+Options layout. Pass the same `labelWidth` to several rows so every input box
+starts at the same horizontal position. Increase `labelWidth` to give longer
+or CJK labels more room.
+
+`password: true` masks the field (TMP `ContentType.Password`).
+
+Both methods return the created `TMP_InputField`, so the caller can read or set
+its value later.
+
+```csharp
+ctx.AddInlineTextInput("Hostname", host, v => host = v);
+ctx.AddInlineTextInput("Port",     port, v => port = v);
+ctx.AddInlineTextInput("Slot",     slot, v => slot = v);
+ctx.AddInlineTextInput("Password", pass, v => pass = v, password: true);
+
+ctx.AddInlineNumberInput("Timeout", timeout, 0f, 60f, 1, v => timeout = v);
+```
+
+---
+
 ## Setting row APIs
 
 Old API:

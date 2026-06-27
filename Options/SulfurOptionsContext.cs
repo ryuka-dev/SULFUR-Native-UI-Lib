@@ -643,6 +643,171 @@ namespace Ryuka.Sulfur.NativeUI
             return input;
         }
 
+        private TMP_InputField BuildInlineInputRow(
+            string name,
+            string label,
+            string value,
+            string placeholder,
+            TMP_InputField.ContentType contentType,
+            float labelWidth)
+        {
+            labelWidth = Mathf.Clamp(labelWidth, 60f, 400f);
+
+            GameObject row = new GameObject(name, typeof(RectTransform), typeof(LayoutElement));
+            row.transform.SetParent(OptionsContainer, false);
+
+            RectTransform rowRt = row.GetComponent<RectTransform>();
+            ApplyNativeRowRect(rowRt, 48f);
+
+            LayoutElement rowLayout = row.GetComponent<LayoutElement>();
+            rowLayout.minHeight = 48f;
+            rowLayout.preferredHeight = 48f;
+            rowLayout.minWidth = GetNativeOptionWidth();
+            rowLayout.preferredWidth = GetNativeOptionWidth();
+
+            TextMeshProUGUI sample = FindSampleText();
+
+            // Fixed-width label column on the left so inputs in different rows
+            // all start at the same horizontal position.
+            GameObject labelObject = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            labelObject.transform.SetParent(row.transform, false);
+
+            RectTransform labelRt = labelObject.GetComponent<RectTransform>();
+            labelRt.anchorMin = new Vector2(0f, 0f);
+            labelRt.anchorMax = new Vector2(0f, 1f);
+            labelRt.pivot = new Vector2(0f, 0.5f);
+            labelRt.sizeDelta = new Vector2(labelWidth, 0f);
+            labelRt.anchoredPosition = new Vector2(8f, 0f);
+
+            TextMeshProUGUI labelText = labelObject.GetComponent<TextMeshProUGUI>();
+            labelText.text = label ?? "";
+            labelText.alignment = TextAlignmentOptions.MidlineLeft;
+            labelText.raycastTarget = false;
+            labelText.textWrappingMode = TextWrappingModes.NoWrap;
+            labelText.overflowMode = TextOverflowModes.Ellipsis;
+
+            if (sample != null)
+            {
+                labelText.font = sample.font;
+                labelText.fontSharedMaterial = sample.fontSharedMaterial;
+                labelText.fontSize = Mathf.Max(14f, sample.fontSize * 0.78f);
+                labelText.color = new Color(sample.color.r, sample.color.g, sample.color.b, 0.85f);
+            }
+            else
+            {
+                labelText.fontSize = 16f;
+                labelText.color = new Color(1f, 1f, 1f, 0.85f);
+            }
+
+            // Input box fills the remaining width, starting just past the label column.
+            GameObject box = new GameObject("InputBox", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(TMP_InputField));
+            box.transform.SetParent(row.transform, false);
+
+            RectTransform boxRt = box.GetComponent<RectTransform>();
+            boxRt.anchorMin = new Vector2(0f, 0f);
+            boxRt.anchorMax = new Vector2(1f, 1f);
+            boxRt.offsetMin = new Vector2(labelWidth + 16f, 6f);
+            boxRt.offsetMax = new Vector2(0f, -6f);
+
+            Image background = box.GetComponent<Image>();
+            background.color = new Color(1f, 1f, 1f, 0.055f);
+            background.raycastTarget = true;
+
+            TMP_InputField input = box.GetComponent<TMP_InputField>();
+            PopulateInputFieldBox(input, background, boxRt, value, placeholder, contentType);
+
+            return input;
+        }
+
+        private void PopulateInputFieldBox(
+            TMP_InputField input,
+            Image background,
+            RectTransform boxRt,
+            string value,
+            string placeholder,
+            TMP_InputField.ContentType contentType)
+        {
+            input.targetGraphic = background;
+            input.contentType = contentType;
+            input.lineType = TMP_InputField.LineType.SingleLine;
+            input.shouldHideMobileInput = true;
+            input.shouldHideSoftKeyboard = true;
+            input.shouldActivateOnSelect = true;
+            input.onFocusSelectAll = false;
+            input.resetOnDeActivation = false;
+            input.restoreOriginalTextOnEscape = false;
+
+            TextMeshProUGUI sampleText = FindSampleText();
+            TMP_FontAsset font = sampleText != null ? sampleText.font : null;
+            Color textColor = sampleText != null ? sampleText.color : Color.white;
+            float fontSize = sampleText != null ? sampleText.fontSize : 22f;
+
+            input.customCaretColor = true;
+            input.caretColor = textColor;
+            input.caretWidth = 2;
+            input.caretBlinkRate = 0.85f;
+            input.selectionColor = new Color(textColor.r, textColor.g, textColor.b, 0.25f);
+
+            GameObject textArea = new GameObject("TextArea", typeof(RectTransform), typeof(RectMask2D));
+            textArea.transform.SetParent(boxRt, false);
+            RectTransform textAreaRt = textArea.GetComponent<RectTransform>();
+            textAreaRt.anchorMin = Vector2.zero;
+            textAreaRt.anchorMax = Vector2.one;
+            textAreaRt.offsetMin = new Vector2(12f, 0f);
+            textAreaRt.offsetMax = new Vector2(-12f, 0f);
+
+            GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(textArea.transform, false);
+            RectTransform textRt = textObject.GetComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = Vector2.zero;
+            textRt.offsetMax = Vector2.zero;
+
+            TextMeshProUGUI textComponent = textObject.GetComponent<TextMeshProUGUI>();
+            textComponent.text = value ?? "";
+            textComponent.fontSize = fontSize;
+            textComponent.color = textColor;
+            textComponent.alignment = TextAlignmentOptions.MidlineLeft;
+            textComponent.raycastTarget = false;
+            textComponent.textWrappingMode = TextWrappingModes.NoWrap;
+            textComponent.overflowMode = TextOverflowModes.Overflow;
+            if (font != null)
+                textComponent.font = font;
+
+            GameObject placeholderObject = new GameObject("Placeholder", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            placeholderObject.transform.SetParent(textArea.transform, false);
+            RectTransform placeholderRt = placeholderObject.GetComponent<RectTransform>();
+            placeholderRt.anchorMin = Vector2.zero;
+            placeholderRt.anchorMax = Vector2.one;
+            placeholderRt.offsetMin = Vector2.zero;
+            placeholderRt.offsetMax = Vector2.zero;
+
+            TextMeshProUGUI placeholderComponent = placeholderObject.GetComponent<TextMeshProUGUI>();
+            placeholderComponent.text = placeholder ?? "";
+            placeholderComponent.fontSize = fontSize;
+            placeholderComponent.color = new Color(textColor.r, textColor.g, textColor.b, 0.38f);
+            placeholderComponent.alignment = TextAlignmentOptions.MidlineLeft;
+            placeholderComponent.raycastTarget = false;
+            placeholderComponent.textWrappingMode = TextWrappingModes.NoWrap;
+            placeholderComponent.overflowMode = TextOverflowModes.Overflow;
+            if (font != null)
+                placeholderComponent.font = font;
+
+            input.textViewport = textAreaRt;
+            input.textComponent = textComponent;
+            input.placeholder = placeholderComponent;
+            input.SetTextWithoutNotify(value ?? "");
+
+            SulfurInputCaretOverlay.Attach(input, textComponent, textAreaRt, textColor);
+
+            SulfurTextInputBinding inputBinding = input.gameObject.AddComponent<SulfurTextInputBinding>();
+            inputBinding.Configure(input);
+
+            SulfurInputVisualState visualState = input.gameObject.AddComponent<SulfurInputVisualState>();
+            visualState.Configure(input, background);
+        }
+
         internal TextMeshProUGUI FindSampleText()
         {
             if (sampleTextCacheInitialized)
@@ -1192,6 +1357,82 @@ namespace Ryuka.Sulfur.NativeUI
             }));
 
             return labelOption;
+        }
+
+        // --- Inline input rows (label and input on the same line) -----------
+        // Place the label and the input field on a single row, matching the
+        // vanilla Options layout. Pass the same labelWidth to several rows so
+        // every input starts at the same horizontal position:
+        //
+        //     ctx.AddInlineTextInput("Hostname", host, v => host = v);
+        //     ctx.AddInlineTextInput("Port",     port, v => port = v);
+        //     ctx.AddInlineTextInput("Password", pass, v => pass = v, password: true);
+        //
+        // These are additive; the stacked AddTextInput / AddNumberInput helpers
+        // are unchanged.
+
+        public TMP_InputField AddInlineTextInput(
+            string label,
+            string value,
+            Action<string> onChanged,
+            float labelWidth = 160f,
+            bool password = false)
+        {
+            TMP_InputField input = BuildInlineInputRow(
+                "SULFUR_InlineText_" + (label ?? ""),
+                label,
+                value ?? "",
+                "Enter text...",
+                password ? TMP_InputField.ContentType.Password : TMP_InputField.ContentType.Standard,
+                labelWidth);
+
+            input.onValueChanged.RemoveAllListeners();
+            input.onValueChanged.AddListener(new UnityAction<string>(delegate (string text)
+            {
+                if (onChanged != null)
+                    onChanged(text);
+            }));
+
+            return input;
+        }
+
+        public TMP_InputField AddInlineNumberInput(
+            string label,
+            float value,
+            float min,
+            float max,
+            int decimals,
+            Action<float> onChanged,
+            float labelWidth = 160f)
+        {
+            TMP_InputField input = BuildInlineInputRow(
+                "SULFUR_InlineNumber_" + (label ?? ""),
+                label,
+                FormatNumber(value, decimals),
+                "Enter number...",
+                TMP_InputField.ContentType.DecimalNumber,
+                labelWidth);
+
+            input.onEndEdit.RemoveAllListeners();
+            input.onEndEdit.AddListener(new UnityAction<string>(delegate (string text)
+            {
+                float parsed;
+                if (!TryParseNumber(text, out parsed))
+                {
+                    input.SetTextWithoutNotify(FormatNumber(value, decimals));
+                    return;
+                }
+
+                parsed = Mathf.Clamp(parsed, min, max);
+                parsed = RoundNumber(parsed, decimals);
+
+                input.SetTextWithoutNotify(FormatNumber(parsed, decimals));
+
+                if (onChanged != null)
+                    onChanged(parsed);
+            }));
+
+            return input;
         }
 
         private OptionsScreenOption AddTextInputInternal(
