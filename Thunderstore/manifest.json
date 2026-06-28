@@ -1,6 +1,6 @@
 {
   "name": "SULFUR_Native_UI_Lib",
-  "version_number": "0.8.0",
+  "version_number": "0.9.0",
   "website_url": "https://github.com/ryuka-dev/SULFUR-Native-UI-Lib",
   "description": "A native Options screen UI library for SULFUR BepInEx mods.",
   "dependencies": [

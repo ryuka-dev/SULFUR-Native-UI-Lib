@@ -19,13 +19,6 @@ namespace Ryuka.Sulfur.NativeUI
         // Above virtually all game UI; the vanilla HUD canvases sit far below this.
         private const int OverlaySortingOrder = 32000;
 
-        // SULFUR's signature amber, used for accents/borders. Matches the fallback
-        // the OptionsScreen styling uses (section lines, themed-group borders).
-        private static readonly Color FallbackAccent = new Color(1f, 0.62f, 0.18f, 1f);
-
-        // Warm near-black panel fill — closer to SULFUR's earthy chrome than pure black.
-        private static readonly Color PanelFill = new Color(0.05f, 0.04f, 0.03f, 0.88f);
-
         private static SulfurPopupController instance;
 
         private GameObject bannerRoot;     // toggled active/inactive to show/hide
@@ -122,7 +115,7 @@ namespace Ryuka.Sulfur.NativeUI
             panelRt.anchoredPosition = new Vector2(0f, 220f);
 
             Image background = bannerRoot.GetComponent<Image>();
-            background.color = PanelFill;
+            background.color = SulfurUiTheme.PanelFill;
             background.raycastTarget = false;
 
             HorizontalLayoutGroup layout = bannerRoot.GetComponent<HorizontalLayoutGroup>();
@@ -153,7 +146,7 @@ namespace Ryuka.Sulfur.NativeUI
             label.textWrappingMode = TextWrappingModes.NoWrap;
             label.overflowMode = TextOverflowModes.Overflow;
             label.fontSize = 34f;
-            label.color = new Color(0.94f, 0.90f, 0.84f, 1f); // warm off-white
+            label.color = SulfurUiTheme.TextPrimary;
 
             // Thin amber rules above and below the text — SULFUR's UI leans on this
             // accent. They stretch to the panel edges and stay out of the layout.
@@ -192,7 +185,7 @@ namespace Ryuka.Sulfur.NativeUI
             layout.ignoreLayout = true;
 
             Image image = line.GetComponent<Image>();
-            image.color = FallbackAccent;
+            image.color = SulfurUiTheme.Accent;
             image.raycastTarget = false;
 
             return image;
@@ -210,7 +203,7 @@ namespace Ryuka.Sulfur.NativeUI
             if (fontResolved || label == null)
                 return;
 
-            TextMeshProUGUI sample = FindLiveGameText();
+            TextMeshProUGUI sample = SulfurUiFont.FindLiveGameText(transform);
             if (sample != null && sample.font != null)
             {
                 label.font = sample.font;
@@ -223,29 +216,6 @@ namespace Ryuka.Sulfur.NativeUI
             // Temporary fallback: readable now, retried (and replaced) on next show.
             if (label.font == null && TMP_Settings.defaultFontAsset != null)
                 label.font = TMP_Settings.defaultFontAsset;
-        }
-
-        /// <summary>
-        /// Find an active, enabled TextMeshProUGUI in the loaded scene to sample the
-        /// localized font from. Our own banner label is skipped.
-        /// FindObjectsOfType returns only active scene components (not prefab assets),
-        /// so this naturally reflects the live, current-language HUD chrome.
-        /// </summary>
-        private TextMeshProUGUI FindLiveGameText()
-        {
-            TextMeshProUGUI[] texts = Object.FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.None);
-            if (texts == null)
-                return null;
-
-            foreach (TextMeshProUGUI text in texts)
-            {
-                if (text == null || text == label || text.font == null)
-                    continue;
-
-                return text;
-            }
-
-            return null;
         }
     }
 }

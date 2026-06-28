@@ -119,3 +119,7 @@ Fixed
 ## 0.8.0
 Added
 - New in-game popup banner for mod developers (`SulfurPopupApi.ShowBanner` / `HideBanner`): a single centered, persistent on-screen message that can appear during normal gameplay and combat, styled to match the game's UI. It is display-only — it never pauses the game, captures input, or changes the cursor, so the calling mod keeps full control of any keypress.
+
+## 0.9.0
+Added
+- New in-game toast notifications for mod developers (`SulfurToastApi.Show`): short messages that slide into the top-right corner during gameplay, hold briefly, then animate away. Supports an optional title and custom duration, and multiple toasts stack with smooth slide/fade animations. Display-only and passive — it never pauses the game, captures input, or changes the cursor.

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.0
+
+### Added
+
+- Toast notifications — a new HUD surface for transient messages in the
+  top-right corner during normal gameplay. `SulfurToastApi.Show(...)` (message,
+  optional title, optional duration) shows a fire-and-forget card that animates
+  in, holds, and animates out on its own. Multiple toasts stack (newest on top,
+  up to ~5); older ones glide aside to make room. Apple-style motion — slide +
+  fade + scale on enter/exit with a slight overshoot, `SmoothDamp` restacking —
+  all on unscaled time. Self-built uGUI overlay, passive (no `Time.timeScale`,
+  no input capture, no cursor-lock change), language-correct font. See
+  `docs/TOAST_NOTIFICATIONS.md`.
+
+### Changed
+
+- Factored the banner's palette and font sampling into shared `SulfurUiTheme`
+  and `SulfurUiFont` helpers, now used by both the banner and toasts. No
+  behavior change to the banner.
+
 ## 0.8.0
 
 ### Added

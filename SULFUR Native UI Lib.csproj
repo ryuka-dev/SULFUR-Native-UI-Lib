@@ -121,6 +121,11 @@
     <Compile Include="Localization\SulfurLocalization.cs" />
     <Compile Include="Popup\SulfurPopupApi.cs" />
     <Compile Include="Popup\SulfurPopupController.cs" />
+    <Compile Include="Core\SulfurUiTheme.cs" />
+    <Compile Include="Core\SulfurUiFont.cs" />
+    <Compile Include="Toast\SulfurToastApi.cs" />
+    <Compile Include="Toast\SulfurToastView.cs" />
+    <Compile Include="Toast\SulfurToastController.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!--
