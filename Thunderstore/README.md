@@ -115,3 +115,7 @@ Fixed
 ## 0.7.3
 Fixed
 - Fixed custom rows (badges, descriptions, section headers, text/number inputs) showing as blank boxes in non-English languages such as Chinese, Japanese, Korean, and Russian. They now use the game's current language font instead of the default Latin font.
+
+## 0.8.0
+Added
+- New in-game popup banner for mod developers (`SulfurPopupApi.ShowBanner` / `HideBanner`): a single centered, persistent on-screen message that can appear during normal gameplay and combat, styled to match the game's UI. It is display-only — it never pauses the game, captures input, or changes the cursor, so the calling mod keeps full control of any keypress.

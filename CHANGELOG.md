@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.0
+
+### Added
+
+- In-game popup banner — a new HUD surface independent of the Options screen.
+  `SulfurPopupApi.ShowBanner(string)` / `HideBanner()` show a single centered,
+  persistent message banner during normal gameplay/combat. It is a self-built
+  uGUI overlay (`Canvas` + `TextMeshProUGUI`) styled to match SULFUR's chrome
+  (warm panel fill, amber accent rules) with a language-correct font sampled
+  from live game text. Display-only and passive — no `Time.timeScale` change,
+  no input capture, no cursor-lock change; the caller keeps ownership of any
+  keypress. Created lazily on first show and free while hidden. See
+  `docs/POPUP_BANNER.md`.
+
 ## 0.7.3
 
 ### Fixed

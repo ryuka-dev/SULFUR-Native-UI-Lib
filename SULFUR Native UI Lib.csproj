@@ -119,6 +119,8 @@
     <Compile Include="State\SulfurPageStateStore.cs" />
     <Compile Include="State\SulfurOptionsStateExtensions.cs" />
     <Compile Include="Localization\SulfurLocalization.cs" />
+    <Compile Include="Popup\SulfurPopupApi.cs" />
+    <Compile Include="Popup\SulfurPopupController.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!--
