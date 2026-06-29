@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.10.0
+
+### Added
+
+- **Missing-glyph fallback chain.** Builds a runtime, dynamically-rasterized
+  fallback chain from installed OS fonts so missing characters render even when
+  the game's active font lacks them — a broad **CJK** face (for Chinese/Japanese/
+  Korean missing from a Latin-only font like `Merriweather-Light SDF`) plus a
+  **symbol** face (for ✓ ✗ ○ ● ▶ etc. missing even from the game's CJK subset
+  `Chinese_Serif_NotoSansSC-Light SDF`). Fallback is **per-glyph**: the primary
+  font and its style are kept for every character it already has; only the missing
+  ones come from the chain, searched in order. Loaded via TMP's system-font path
+  (reads the real font file + face index, so `.ttc` collections work); each
+  candidate is verified to actually render its probe before use, and the chain is
+  attached both globally and onto the active font's own fallback table (the game's
+  per-language font isn't always reached via the global list). No bundled assets.
+  Best-effort and idempotent; fixes blank "缺字" rows and also covers the game's
+  own text.
+- **`ctx.AddButtonRow(...)`** — lays several small buttons out left-to-right in a
+  single row (left-aligned), instead of one stacked, right-aligned row per button.
+  Each `SulfurButton` is `(label, onPressed)` with an optional fixed `minWidth`.
+  Use it for compact button groups on one line; `AddSmallButton` is unchanged for
+  the single-button-per-row case.
+- **Live-update handles** for options-page rows, so a page can change parts of
+  itself while it is open without a full `ctx.Rebuild()` (mirrors the existing
+  `SulfurSettingHandle`):
+  - `ctx.AddTextRow(text)` → `SulfurTextHandle` with `SetText` / `SetColor` /
+    `SetVisible`. A plain, full-opacity text row meant for status lines and
+    values that change at runtime.
+  - `ctx.AddButtonRow(...)` now returns `IReadOnlyList<SulfurButtonHandle>`, one
+    per button, with `SetLabel` / `SetInteractable` / `SetVisible`. Disabling a
+    button greys its background and label. (Layout behavior is unchanged.)
+  - `ctx.AddList()` → `SulfurListHandle` with `Update(ctx => { ... })` / `Clear()`
+    / `SetVisible`. A refreshable section that rebuilds its rows in place using
+    the normal `Add*` API — for live tables (e.g. player + ping + kick button).
+
+### Changed
+
+- `AddButtonRow` return type changed from `void` to
+  `IReadOnlyList<SulfurButtonHandle>`. It was introduced in this same release and
+  had not shipped, so no released API is affected. All other row/button APIs
+  (`AddSmallButton`, `AddButton`, `AddDescription`, …) are unchanged.
+
 ## 0.9.0
 
 ### Added

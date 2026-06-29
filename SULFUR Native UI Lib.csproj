@@ -101,6 +101,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Core\Plugin.cs" />
     <Compile Include="Core\SulfurReflection.cs" />
+    <Compile Include="Core\SulfurFontFallback.cs" />
     <Compile Include="Core\SulfurMessageKind.cs" />
     <Compile Include="Options\SulfurOptionsApi.cs" />
     <Compile Include="Options\SulfurOptionsPage.cs" />
@@ -110,6 +111,9 @@
     <Compile Include="Integration\SulfurCustomCategoryMarker.cs" />
     <Compile Include="Rows\SulfurSettingRow.cs" />
     <Compile Include="Rows\SulfurSettingHandle.cs" />
+    <Compile Include="Rows\SulfurTextHandle.cs" />
+    <Compile Include="Rows\SulfurButtonHandle.cs" />
+    <Compile Include="Rows\SulfurListHandle.cs" />
     <Compile Include="Rows\SulfurOptionsSettingRows.cs" />
     <Compile Include="Rows\SulfurOptionsFoldoutExtensions.cs" />
     <Compile Include="Rows\SulfurOptionBinding.cs" />

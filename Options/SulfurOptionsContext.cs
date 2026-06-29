@@ -221,6 +221,21 @@ namespace Ryuka.Sulfur.NativeUI
 
         private void EndThemedGroup()
         {
+            PopContainer();
+        }
+
+        // Redirect subsequent Add* calls into a child container (e.g. a list's own
+        // RectTransform), then restore. Wraps the same stack logic used by
+        // BeginThemedGroup/EndThemedGroup so SulfurListHandle can rebuild its rows
+        // through the normal Add* API.
+        internal void PushContainer(RectTransform container)
+        {
+            containerStack.Push(currentOptionsContainer);
+            currentOptionsContainer = container;
+        }
+
+        internal void PopContainer()
+        {
             if (containerStack.Count > 0)
                 currentOptionsContainer = containerStack.Pop();
             else
@@ -810,11 +825,23 @@ namespace Ryuka.Sulfur.NativeUI
 
         internal TextMeshProUGUI FindSampleText()
         {
-            if (sampleTextCacheInitialized)
-                return sampleTextCache;
+            // Make sure non-Latin glyph fallback is in place before any custom row is
+            // styled. Idempotent; covers the case where TMP wasn't ready at plugin Awake.
+            SulfurFontFallback.EnsureRegistered();
 
-            sampleTextCacheInitialized = true;
-            sampleTextCache = ResolveSampleText();
+            if (!sampleTextCacheInitialized)
+            {
+                sampleTextCacheInitialized = true;
+                sampleTextCache = ResolveSampleText();
+            }
+
+            // Attach the CJK fallback to the exact font our custom rows render with. The
+            // game's per-language font (e.g. the Chinese Noto subset) is missing some
+            // glyphs (拟, ✓, ○, ...) and the global fallback list isn't reliably consulted
+            // for it, so wire the fallback onto the font asset itself. Idempotent.
+            if (sampleTextCache != null)
+                SulfurFontFallback.EnsureFontHasFallback(sampleTextCache.font);
+
             return sampleTextCache;
         }
 
@@ -1123,6 +1150,56 @@ namespace Ryuka.Sulfur.NativeUI
             return null;
         }
 
+        // A plain, full-opacity text row that returns a live handle. Unlike
+        // AddDescription (dimmed, "— " prefixed, wrapping), this is meant for
+        // status lines / values that change while the page is open: keep the
+        // handle and call SetText/SetColor/SetVisible without a full Rebuild.
+        public SulfurTextHandle AddTextRow(string text)
+        {
+            GameObject row = new GameObject("SULFUR_TextRow", typeof(RectTransform), typeof(LayoutElement));
+            row.transform.SetParent(OptionsContainer, false);
+
+            RectTransform rowRt = row.GetComponent<RectTransform>();
+            ApplyNativeRowRect(rowRt, 42f);
+
+            LayoutElement layout = row.GetComponent<LayoutElement>();
+            layout.minHeight = 42f;
+            layout.preferredHeight = 42f;
+            layout.minWidth = GetNativeOptionWidth();
+            layout.preferredWidth = GetNativeOptionWidth();
+
+            GameObject textObject = new GameObject("TextRowText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(row.transform, false);
+
+            RectTransform textRt = textObject.GetComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = new Vector2(28f, 0f);
+            textRt.offsetMax = new Vector2(-12f, 0f);
+
+            TextMeshProUGUI sample = FindSampleText();
+            TextMeshProUGUI label = textObject.GetComponent<TextMeshProUGUI>();
+            label.text = text ?? "";
+            label.alignment = TextAlignmentOptions.MidlineLeft;
+            label.raycastTarget = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.overflowMode = TextOverflowModes.Ellipsis;
+
+            if (sample != null)
+            {
+                label.font = sample.font;
+                label.fontSize = Mathf.Max(14f, sample.fontSize * 0.72f);
+                label.color = sample.color;
+            }
+            else
+            {
+                label.fontSize = 16f;
+                label.color = Color.white;
+            }
+
+            return new SulfurTextHandle(row, label);
+        }
+
 
         public void AddWarning(string text)
         {
@@ -1300,6 +1377,118 @@ namespace Ryuka.Sulfur.NativeUI
 
             // CJK labels need more width per visible character.
             return Mathf.Clamp(72f + length * 14f, 96f, 180f);
+        }
+
+        // Lays several small buttons out left-to-right inside a single row.
+        // AddSmallButton keeps its original one-button-per-row, right-aligned
+        // behaviour so existing mods are unaffected; use this when you want a
+        // compact button group on one line.
+        public IReadOnlyList<SulfurButtonHandle> AddButtonRow(params SulfurButton[] buttons)
+        {
+            return AddButtonRow((IReadOnlyList<SulfurButton>)buttons);
+        }
+
+        public IReadOnlyList<SulfurButtonHandle> AddButtonRow(IReadOnlyList<SulfurButton> buttons)
+        {
+            if (buttons == null || buttons.Count == 0)
+                return Array.Empty<SulfurButtonHandle>();
+
+            List<SulfurButton> valid = new List<SulfurButton>();
+            foreach (SulfurButton spec in buttons)
+            {
+                if (!string.IsNullOrWhiteSpace(spec.Label))
+                    valid.Add(spec);
+            }
+
+            if (valid.Count == 0)
+                return Array.Empty<SulfurButtonHandle>();
+
+            GameObject row = new GameObject("SULFUR_ButtonRow", typeof(RectTransform), typeof(LayoutElement), typeof(HorizontalLayoutGroup));
+            row.transform.SetParent(OptionsContainer, false);
+
+            RectTransform rowRt = row.GetComponent<RectTransform>();
+            ApplyNativeRowRect(rowRt, 42f);
+
+            LayoutElement layout = row.GetComponent<LayoutElement>();
+            layout.minHeight = 42f;
+            layout.preferredHeight = 42f;
+            layout.minWidth = GetNativeOptionWidth();
+            layout.preferredWidth = GetNativeOptionWidth();
+
+            HorizontalLayoutGroup group = row.GetComponent<HorizontalLayoutGroup>();
+            group.padding = new RectOffset(12, 16, 4, 4);
+            group.spacing = 8f;
+            group.childAlignment = TextAnchor.MiddleLeft;
+            group.childControlWidth = false;
+            group.childControlHeight = true;
+            group.childForceExpandWidth = false;
+            group.childForceExpandHeight = true;
+
+            List<SulfurButtonHandle> handles = new List<SulfurButtonHandle>(valid.Count);
+            foreach (SulfurButton spec in valid)
+            {
+                UIButton button = CreateSmallButton(row.transform, spec.Label, spec.OnPressed);
+                if (button == null)
+                    continue;
+
+                LayoutElement buttonLayout = button.GetComponent<LayoutElement>();
+                if (buttonLayout != null)
+                {
+                    float buttonWidth = spec.MinWidth > 0f ? spec.MinWidth : CalculateSmallButtonWidth(spec.Label);
+                    buttonLayout.minWidth = buttonWidth;
+                    buttonLayout.preferredWidth = buttonWidth;
+                }
+
+                TextMeshProUGUI buttonLabel = button.GetComponentInChildren<TextMeshProUGUI>(true);
+                handles.Add(new SulfurButtonHandle(button.gameObject, button, buttonLabel));
+            }
+
+            return handles;
+        }
+
+        // Creates an empty, refreshable list section and returns a handle. Call
+        // handle.Update(ctx => { ctx.AddTextRow(...); ... }) to (re)populate it in
+        // place without rebuilding the whole page. Used for live tables (player +
+        // ping + kick button) that change while the page is open.
+        public SulfurListHandle AddList()
+        {
+            float width = GetNativeOptionWidth();
+
+            GameObject group = new GameObject(
+                "SULFUR_List",
+                typeof(RectTransform),
+                typeof(LayoutElement),
+                typeof(VerticalLayoutGroup),
+                typeof(ContentSizeFitter));
+
+            group.transform.SetParent(OptionsContainer, false);
+
+            RectTransform rt = group.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(width, 0f);
+
+            LayoutElement groupLayout = group.GetComponent<LayoutElement>();
+            groupLayout.minWidth = width;
+            groupLayout.preferredWidth = width;
+            groupLayout.flexibleWidth = 0f;
+
+            VerticalLayoutGroup layout = group.GetComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(0, 0, 0, 0);
+            layout.spacing = 4f;
+            layout.childAlignment = TextAnchor.UpperLeft;
+            layout.childControlWidth = true;
+            layout.childControlHeight = false;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+
+            ContentSizeFitter fitter = group.GetComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            return new SulfurListHandle(this, rt);
         }
 
 
@@ -1819,6 +2008,13 @@ namespace Ryuka.Sulfur.NativeUI
             UIButton button = go.GetComponent<UIButton>();
             button.targetGraphic = image;
             button.transition = Selectable.Transition.ColorTint;
+
+            // Explicit disabled tint so SetInteractable(false) visibly greys the
+            // button background (handle also dims the label).
+            ColorBlock colors = button.colors;
+            colors.disabledColor = new Color(1f, 1f, 1f, 0.35f);
+            button.colors = colors;
+
             button.onClick.RemoveAllListeners();
 
             if (onPressed != null)
@@ -1924,6 +2120,29 @@ namespace Ryuka.Sulfur.NativeUI
 
             string format = "0." + new string('#', decimals);
             return value.ToString(format, CultureInfo.InvariantCulture);
+        }
+    }
+
+    // Describes a single button inside an AddButtonRow group.
+    public struct SulfurButton
+    {
+        public string Label;
+        public Action OnPressed;
+        // Optional fixed width; 0 lets the row size the button from its label.
+        public float MinWidth;
+
+        public SulfurButton(string label, Action onPressed)
+        {
+            Label = label;
+            OnPressed = onPressed;
+            MinWidth = 0f;
+        }
+
+        public SulfurButton(string label, Action onPressed, float minWidth)
+        {
+            Label = label;
+            OnPressed = onPressed;
+            MinWidth = minWidth;
         }
     }
 }

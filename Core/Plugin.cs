@@ -9,7 +9,7 @@ namespace Ryuka.Sulfur.NativeUI
     {
         public const string PluginGuid = "ryuka.sulfur.nativeui";
         public const string PluginName = "SULFUR Native UI Lib";
-        public const string PluginVersion = "0.9.0";
+        public const string PluginVersion = "0.10.0";
 
         internal static ManualLogSource Log { get; private set; }
 
@@ -21,6 +21,11 @@ namespace Ryuka.Sulfur.NativeUI
 
             harmony = new Harmony(PluginGuid);
             harmony.PatchAll();
+
+            // Register the CJK/non-Latin glyph fallback early so all TMP text (ours and
+            // the game's) can render missing characters. Best-effort + idempotent: if TMP
+            // isn't ready yet, FindSampleText retries when a page is built.
+            SulfurFontFallback.EnsureRegistered();
 
             Logger.LogInfo("SULFUR Native UI Lib loaded.");
         }

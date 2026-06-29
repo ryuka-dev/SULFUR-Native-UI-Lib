@@ -195,9 +195,100 @@ ctx.AddSmallButton("Refresh", () =>
 });
 ```
 
-Adds a small native-style button row.
+Adds a small native-style button row. Each call creates its own full-width
+row and the button is right-aligned. This is the original behaviour and is
+unchanged, so existing mods are unaffected.
+
+### AddButtonRow
+
+```csharp
+ctx.AddButtonRow(
+    new SulfurButton("Save", () => Save()),
+    new SulfurButton("Reset", () => Reset()),
+    new SulfurButton("Cancel", () => Close()));
+```
+
+Lays several small buttons out left-to-right inside a single row (left
+aligned), instead of one stacked row per button. Use this when you want a
+compact button group on one line. Each `SulfurButton` is `(label, onPressed)`,
+with an optional third `minWidth` argument to pin a fixed button width:
+
+```csharp
+new SulfurButton("OK", () => Confirm(), 120f);
+```
+
+Empty/whitespace labels are skipped. For a single button, prefer
+`AddSmallButton`.
+
+`AddButtonRow` returns `IReadOnlyList<SulfurButtonHandle>` (one per button) so you
+can change a button after building — see [Live-update handles](#live-update-handles).
 
 ### AddSpacer
+
+```csharp
+ctx.AddSpacer(12f);
+```
+
+Adds vertical spacing.
+
+---
+
+## Live-update handles
+
+Most rows are built once and are static; to change a page **while it is open**
+(without `ctx.Rebuild()`), use the handle-returning builders. They mirror the
+existing `SulfurSettingHandle` for setting rows.
+
+### AddTextRow → SulfurTextHandle
+
+```csharp
+SulfurTextHandle status = ctx.AddTextRow("● Not connected");
+// later, e.g. from an event or timer:
+status.SetText("● Connected to 1.2.3.4");
+status.SetColor(Color.green);
+status.SetVisible(true);
+```
+
+A plain, full-opacity text row (unlike `AddDescription`, which is dimmed and
+prefixed). Handle: `SetText` / `SetColor` / `SetVisible`. Good for status lines,
+error/reason messages, and read-only values that change at runtime.
+
+### AddButtonRow → SulfurButtonHandle
+
+```csharp
+var buttons = ctx.AddButtonRow(
+    new SulfurButton("Create game", OnCreate),
+    new SulfurButton("Join game", OnJoin));
+
+buttons[1].SetInteractable(false);   // disable Join while hosting
+buttons[0].SetLabel("Hosting…");
+```
+
+Each handle: `SetLabel` / `SetInteractable` / `SetVisible`. A disabled button is
+greyed (background + label).
+
+### AddList → SulfurListHandle
+
+```csharp
+SulfurListHandle players = ctx.AddList();
+
+void RefreshPlayers()
+{
+    players.Update(list =>
+    {
+        list.AddTextRow("Alice — 24 ms");
+        list.AddTextRow("Bob — 31 ms");
+        list.AddButtonRow(new SulfurButton("Kick Bob", () => Kick("Bob")));
+    });
+}
+```
+
+A refreshable section. `Update(build)` clears the list and re-runs `build` with
+the context redirected into the list, so you compose rows with the normal `Add*`
+API. Also `Clear()` and `SetVisible(bool)`. Good for live tables (player + ping +
+per-row actions) refreshed on a timer or network event.
+
+---
 
 ```csharp
 ctx.AddSpacer(12f);

@@ -4,7 +4,7 @@ Native OptionsScreen integration library for SULFUR BepInEx mods.
 
 This library lets external BepInEx mods register custom pages inside the game's native Options screen and build UI using the game's existing OptionsScreen style.
 
-Current target version: `0.9.0+`
+Current target version: `0.10.0+`
 
 The current development standard focuses on large custom Options pages, especially in-game config editor pages. The main design rule is:
 
@@ -20,11 +20,17 @@ Use row handles for local updates and themed groups for section-level visual gro
 - Custom left-side Options category page.
 - Native-style setting rows.
 - Toggle, text, number, and cycle controls.
+- Button rows (`AddButtonRow`) — multiple buttons laid out left-to-right.
 - Foldout groups.
 - Themed section content groups.
 - Footer and status text support.
 - Localization helpers.
 - High-performance row updates through `SulfurSettingHandle`.
+- Live-update handles for text / buttons / refreshable lists
+  (`SulfurTextHandle`, `SulfurButtonHandle`, `SulfurListHandle`) — change a row
+  while the page is open without rebuilding it.
+- Automatic missing-glyph fallback (CJK + symbols) so non-Latin and symbol
+  characters render even when the game's active font lacks them.
 
 ---
 
