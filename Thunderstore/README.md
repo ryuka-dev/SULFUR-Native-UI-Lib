@@ -132,3 +132,7 @@ Added
 
 Changed
 - `AddButtonRow` now returns `IReadOnlyList<SulfurButtonHandle>` instead of `void`. It was introduced in this same release and had not shipped before, so no released API is affected.
+
+## 0.10.1
+Fixed
+- Small-button width now actually applies. Previously the `minWidth` argument and the label-based auto-size had no effect on the rendered width, so every small button stayed at a fixed 120px and labels longer than ~10 characters were cut off with an ellipsis (e.g. `Open-source repo` → `Open-sourc…`). Buttons now size to their label, and an explicit `minWidth` widens them as intended.

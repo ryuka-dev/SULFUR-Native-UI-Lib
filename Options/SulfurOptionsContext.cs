@@ -1357,15 +1357,31 @@ namespace Ryuka.Sulfur.NativeUI
             spacerLayout.flexibleWidth = 1f;
 
             UIButton button = CreateSmallButton(row.transform, safeLabel, onPressed);
-            if (button != null)
+            ApplySmallButtonWidth(button, buttonWidth);
+        }
+
+        // Applies an explicit pixel width to a small button. The button rows use
+        // HorizontalLayoutGroup.childControlWidth = false, so the group sizes each child
+        // from its RectTransform.sizeDelta and IGNORES LayoutElement.min/preferredWidth.
+        // The sizeDelta write below is therefore what actually widens the button (without
+        // it the button stays at the 120px sizeDelta baked in CreateSmallButton and long
+        // labels ellipsise); the LayoutElement is kept in sync so the width is still
+        // honoured if a row is ever switched to control-width mode.
+        private static void ApplySmallButtonWidth(UIButton button, float width)
+        {
+            if (button == null || width <= 0f)
+                return;
+
+            LayoutElement buttonLayout = button.GetComponent<LayoutElement>();
+            if (buttonLayout != null)
             {
-                LayoutElement buttonLayout = button.GetComponent<LayoutElement>();
-                if (buttonLayout != null)
-                {
-                    buttonLayout.minWidth = buttonWidth;
-                    buttonLayout.preferredWidth = buttonWidth;
-                }
+                buttonLayout.minWidth = width;
+                buttonLayout.preferredWidth = width;
             }
+
+            RectTransform rt = button.GetComponent<RectTransform>();
+            if (rt != null)
+                rt.sizeDelta = new Vector2(width, rt.sizeDelta.y);
         }
 
         private static float CalculateSmallButtonWidth(string label)
@@ -1431,13 +1447,8 @@ namespace Ryuka.Sulfur.NativeUI
                 if (button == null)
                     continue;
 
-                LayoutElement buttonLayout = button.GetComponent<LayoutElement>();
-                if (buttonLayout != null)
-                {
-                    float buttonWidth = spec.MinWidth > 0f ? spec.MinWidth : CalculateSmallButtonWidth(spec.Label);
-                    buttonLayout.minWidth = buttonWidth;
-                    buttonLayout.preferredWidth = buttonWidth;
-                }
+                float buttonWidth = spec.MinWidth > 0f ? spec.MinWidth : CalculateSmallButtonWidth(spec.Label);
+                ApplySmallButtonWidth(button, buttonWidth);
 
                 TextMeshProUGUI buttonLabel = button.GetComponentInChildren<TextMeshProUGUI>(true);
                 handles.Add(new SulfurButtonHandle(button.gameObject, button, buttonLabel));

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.10.1
+
+### Fixed
+
+- **Small-button width now actually applies.** `AddSmallButton(label, onPressed,
+  minWidth)` and per-button `SulfurButton.MinWidth` (and the auto-size from the
+  label) previously had no effect on the rendered width: the button rows use
+  `HorizontalLayoutGroup.childControlWidth = false`, which sizes each child from
+  its `RectTransform.sizeDelta` and ignores `LayoutElement.min/preferredWidth`, so
+  every small button stayed at the 120px baseline baked into the button and labels
+  longer than ~10 characters were ellipsised (e.g. `Open-source repo` →
+  `Open-sourc…`). The computed width is now written to the button's `sizeDelta`, so
+  explicit `minWidth` and the label-based auto-size both take effect. **Behaviour
+  change:** small buttons that relied on the old fixed 120px width now size to
+  their label (auto-size range 96–180px); pass an explicit `minWidth` for a wider
+  button.
+
 ## 0.10.0
 
 ### Added

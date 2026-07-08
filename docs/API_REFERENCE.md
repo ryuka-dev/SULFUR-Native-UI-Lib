@@ -196,8 +196,18 @@ ctx.AddSmallButton("Refresh", () =>
 ```
 
 Adds a small native-style button row. Each call creates its own full-width
-row and the button is right-aligned. This is the original behaviour and is
-unchanged, so existing mods are unaffected.
+row and the button is right-aligned.
+
+The button sizes itself to its label (auto-size range 96–180px). For a wider
+button — e.g. a long label that would otherwise be clipped — pass an explicit
+width via the third argument:
+
+```csharp
+ctx.AddSmallButton("Open-source repo", () => OpenUrl(repo), 260f);
+```
+
+(Before 0.10.1 this width was ignored and every small button rendered at a
+fixed 120px, ellipsising labels longer than ~10 characters.)
 
 ### AddButtonRow
 
