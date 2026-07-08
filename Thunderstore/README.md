@@ -123,3 +123,12 @@ Added
 ## 0.9.0
 Added
 - New in-game toast notifications for mod developers (`SulfurToastApi.Show`): short messages that slide into the top-right corner during gameplay, hold briefly, then animate away. Supports an optional title and custom duration, and multiple toasts stack with smooth slide/fade animations. Display-only and passive — it never pauses the game, captures input, or changes the cursor.
+
+## 0.10.0
+Added
+- `AddButtonRow(...)` for mod developers: lays several small buttons out left-to-right in one row instead of one stacked row per button. `AddSmallButton` is unchanged for the single-button case.
+- Live-update row handles so a page can change parts of itself while open without a full rebuild: `AddTextRow` returns a `SulfurTextHandle`, `AddButtonRow` returns per-button `SulfurButtonHandle`s, and `AddList` returns a `SulfurListHandle` for refreshable sections.
+- Automatic missing-glyph fallback built from installed OS fonts (a broad CJK face plus a symbol face), applied per-glyph on top of the game's active font. Fixes blank rows and missing symbols (e.g. checkmarks) in non-English languages without any bundled font assets.
+
+Changed
+- `AddButtonRow` now returns `IReadOnlyList<SulfurButtonHandle>` instead of `void`. It was introduced in this same release and had not shipped before, so no released API is affected.
