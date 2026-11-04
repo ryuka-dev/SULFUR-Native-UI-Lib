@@ -2,7 +2,7 @@
 
 This document records the development intent and implementation decisions for SULFUR Native UI Lib.
 
-It is written for future maintainers and AI-assisted development sessions.
+It is written for future maintainers.
 
 ## Project purpose
 
