@@ -24,6 +24,16 @@ namespace Ryuka.Sulfur.NativeUI
             if (page.BuildPage == null)
                 throw new ArgumentException("BuildPage is required.");
 
+            SulfurOptionsPage existing = GetPage(page.PageId);
+            if (existing != null && !ReferenceEquals(existing, page) && Plugin.Log != null)
+            {
+                // Page ids are global across mods; a second registration silently taking over
+                // another mod's page is almost always an id collision.
+                Plugin.Log.LogWarning(
+                    "SULFUR native options page id '" + page.PageId + "' is already registered by " + Describe(existing) +
+                    "; replacing it with the page from " + Describe(page) + ".");
+            }
+
             pages.RemoveAll(x => string.Equals(x.PageId, page.PageId, StringComparison.OrdinalIgnoreCase));
             pages.Add(page);
 
@@ -46,6 +56,27 @@ namespace Ryuka.Sulfur.NativeUI
                 return;
 
             pages.RemoveAll(x => string.Equals(x.PageId, pageId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // "'Display name' (Assembly: Type.Method)" of the page's BuildPage, for the
+        // duplicate-id warning. Best effort; never throws.
+        private static string Describe(SulfurOptionsPage page)
+        {
+            string name = "'" + (page.DisplayName ?? page.PageId) + "'";
+
+            try
+            {
+                System.Reflection.MethodInfo method = page.BuildPage != null ? page.BuildPage.Method : null;
+                if (method == null || method.DeclaringType == null)
+                    return name;
+
+                Type type = method.DeclaringType;
+                return name + " (" + type.Assembly.GetName().Name + ": " + type.FullName + "." + method.Name + ")";
+            }
+            catch
+            {
+                return name;
+            }
         }
 
         internal static SulfurOptionsPage GetPage(string pageId)

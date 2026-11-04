@@ -108,6 +108,68 @@ string valueLabel = SulfurLocalization.Get(
 
 ---
 
+## Following the game's language
+
+Text a mod shows itself (HUD, overlays, its own labels) has to follow the player's
+language. Use `SulfurLanguage.Follow`; do not read I2 Localization or subscribe to
+the game's `AsyncAssetLoading.onLanguageChange` yourself, and do not poll.
+
+```csharp
+private IDisposable languageFollow;
+
+private void ShowOverlay()
+{
+    languageFollow = SulfurLanguage.Follow(_ => ApplyTexts());
+}
+
+private void ApplyTexts()
+{
+    titleText.text = SulfurLanguage.FixRtl(
+        SulfurLocalization.Get(PluginGuid, "overlay.title", "Overlay"));
+}
+
+private void HideOverlay()
+{
+    languageFollow?.Dispose();
+    languageFollow = null;
+}
+```
+
+`Follow` handles what each mod used to handle on its own:
+
+- **Startup language.** The game sets its startup language without raising any
+  event, so a player who starts in Chinese never sees a "language changed"
+  notification. `Follow` calls back as soon as the language is known: right away
+  if it already is, otherwise once the game finishes loading.
+- **Ordering.** On a change, the callback runs after all of the game's own
+  language-change handlers, so text you set is not overwritten by the game.
+- **Lifetime and errors.** `Dispose` unsubscribes. An exception in a callback is
+  logged as a warning and does not affect other subscribers.
+- **Lookup state.** `SulfurLocalization.Get` already uses the new language inside
+  the callback.
+
+`SulfurLanguage.FixRtl` shapes right-to-left text (Arabic) the way the game shapes
+its own translations, and returns other text unchanged. Apply it once when the text
+is resolved, not every frame. Text passed to options-page rows is resolved when the
+page is built.
+
+Fallback chain of `Get`: the exact language code, then the language without its
+region (`zh-TW` -> `zh`), then `en`, key by key. `SulfurLanguage.Code` is `"en"`
+until `SulfurLanguage.IsReady`.
+
+See [API Reference: Language API](API_REFERENCE.md#language-api).
+
+---
+
+## The library's own text
+
+The few strings the library itself renders (message prefixes, input placeholder,
+"No options.", badge fallbacks) live in this repository's `lang/<code>.json`, under
+the library's own plugin GUID, with keys prefixed `ui.`. They are deployed next to
+the dll as `lang/`.
+
+---
+
 ## Language ownership rule
 
 Correct:

@@ -57,8 +57,6 @@ namespace Ryuka.Sulfur.NativeUI
 
         public static SulfurToastView Create(
             Transform parent,
-            TMP_FontAsset font,
-            Material fontMaterial,
             string title,
             string message,
             float holdDuration)
@@ -108,9 +106,9 @@ namespace Ryuka.Sulfur.NativeUI
             CreateAccentBar(rect);
 
             if (!string.IsNullOrEmpty(title))
-                CreateText(card.transform, font, fontMaterial, title, 22f, FontStyles.Bold, SulfurUiTheme.Accent);
+                CreateText(card.transform, SulfurToastController.TitleRole, title, 22f, SulfurUiTheme.Accent);
 
-            CreateText(card.transform, font, fontMaterial, message ?? "", 19f, FontStyles.Normal, SulfurUiTheme.TextPrimary);
+            CreateText(card.transform, SulfurToastController.MessageRole, message ?? "", 19f, SulfurUiTheme.TextPrimary);
 
             // Force a layout pass now so we can read the final card height for stacking.
             LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
@@ -149,11 +147,9 @@ namespace Ryuka.Sulfur.NativeUI
 
         private static void CreateText(
             Transform parent,
-            TMP_FontAsset font,
-            Material fontMaterial,
+            SulfurFontRole role,
             string content,
             float fontSize,
-            FontStyles style,
             Color color)
         {
             GameObject textObject = new GameObject(
@@ -167,7 +163,8 @@ namespace Ryuka.Sulfur.NativeUI
             TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
             text.text = content;
             text.fontSize = fontSize;
-            text.fontStyle = style;
+            // Weight comes from the role's font, as in the game's own HUD text; no faux bold.
+            text.fontStyle = FontStyles.Normal;
             text.color = color;
             text.alignment = TextAlignmentOptions.TopLeft;
             text.raycastTarget = false;
@@ -176,10 +173,7 @@ namespace Ryuka.Sulfur.NativeUI
             // Leave room for the accent bar on the left.
             text.margin = new Vector4(6f, 0f, 0f, 0f);
 
-            if (font != null)
-                text.font = font;
-            if (fontMaterial != null)
-                text.fontSharedMaterial = fontMaterial;
+            SulfurFonts.Bind(text, role);
         }
 
         /// <summary>Set the vertical slot this card should occupy (top edge Y).</summary>

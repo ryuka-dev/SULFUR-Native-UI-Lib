@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "key": "ui.message.warning_prefix",
+      "value": "UYARI: "
+    },
+    {
+      "key": "ui.message.error_prefix",
+      "value": "HATA: "
+    },
+    {
+      "key": "ui.message.success_prefix",
+      "value": "TAMAM: "
+    },
+    {
+      "key": "ui.input.placeholder",
+      "value": "Metin girin..."
+    },
+    {
+      "key": "ui.page.no_options",
+      "value": "Seçenek yok."
+    },
+    {
+      "key": "ui.badge.dirty",
+      "value": "Bekliyor"
+    },
+    {
+      "key": "ui.badge.clean",
+      "value": "Değişmedi"
+    },
+    {
+      "key": "ui.button.default",
+      "value": "Varsayılan"
+    },
+    {
+      "key": "ui.footer.apply",
+      "value": "Uygula"
+    },
+    {
+      "key": "ui.foldout.mod_tag",
+      "value": "MOD"
+    },
+    {
+      "key": "ui.input.number_placeholder",
+      "value": "Sayı girin..."
+    },
+    {
+      "key": "ui.page.load_failed",
+      "value": "Bu sayfa yüklenemedi. BepInEx günlüğüne bakın."
+    },
+    {
+      "key": "ui.badge.restart_required",
+      "value": "Yeniden başlatma gerekli"
+    },
+    {
+      "key": "ui.badge.live_apply",
+      "value": "Anında uygula"
+    },
+    {
+      "key": "ui.badge.advanced",
+      "value": "Gelişmiş"
+    },
+    {
+      "key": "ui.badge.hidden",
+      "value": "Gizli"
+    },
+    {
+      "key": "ui.badge.dangerous",
+      "value": "Tehlikeli"
+    }
+  ]
+}

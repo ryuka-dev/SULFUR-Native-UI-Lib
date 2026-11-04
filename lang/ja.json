@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "key": "ui.message.warning_prefix",
+      "value": "警告："
+    },
+    {
+      "key": "ui.message.error_prefix",
+      "value": "エラー："
+    },
+    {
+      "key": "ui.message.success_prefix",
+      "value": "OK："
+    },
+    {
+      "key": "ui.input.placeholder",
+      "value": "テキストを入力..."
+    },
+    {
+      "key": "ui.page.no_options",
+      "value": "オプションはありません。"
+    },
+    {
+      "key": "ui.badge.dirty",
+      "value": "未適用"
+    },
+    {
+      "key": "ui.badge.clean",
+      "value": "未変更"
+    },
+    {
+      "key": "ui.button.default",
+      "value": "デフォルト"
+    },
+    {
+      "key": "ui.footer.apply",
+      "value": "適用"
+    },
+    {
+      "key": "ui.foldout.mod_tag",
+      "value": "MOD"
+    },
+    {
+      "key": "ui.input.number_placeholder",
+      "value": "数値を入力..."
+    },
+    {
+      "key": "ui.page.load_failed",
+      "value": "このページを読み込めませんでした。BepInEx のログを確認してください。"
+    },
+    {
+      "key": "ui.badge.restart_required",
+      "value": "再起動が必要"
+    },
+    {
+      "key": "ui.badge.live_apply",
+      "value": "即時反映"
+    },
+    {
+      "key": "ui.badge.advanced",
+      "value": "詳細"
+    },
+    {
+      "key": "ui.badge.hidden",
+      "value": "非表示"
+    },
+    {
+      "key": "ui.badge.dangerous",
+      "value": "危険"
+    }
+  ]
+}

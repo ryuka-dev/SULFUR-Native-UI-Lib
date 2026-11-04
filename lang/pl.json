@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "key": "ui.message.warning_prefix",
+      "value": "OSTRZEŻENIE: "
+    },
+    {
+      "key": "ui.message.error_prefix",
+      "value": "BŁĄD: "
+    },
+    {
+      "key": "ui.message.success_prefix",
+      "value": "OK: "
+    },
+    {
+      "key": "ui.input.placeholder",
+      "value": "Wpisz tekst..."
+    },
+    {
+      "key": "ui.page.no_options",
+      "value": "Brak opcji."
+    },
+    {
+      "key": "ui.badge.dirty",
+      "value": "Oczekujące"
+    },
+    {
+      "key": "ui.badge.clean",
+      "value": "Bez zmian"
+    },
+    {
+      "key": "ui.button.default",
+      "value": "Domyślne"
+    },
+    {
+      "key": "ui.footer.apply",
+      "value": "Zastosuj"
+    },
+    {
+      "key": "ui.foldout.mod_tag",
+      "value": "MOD"
+    },
+    {
+      "key": "ui.input.number_placeholder",
+      "value": "Wpisz liczbę..."
+    },
+    {
+      "key": "ui.page.load_failed",
+      "value": "Nie udało się wczytać tej strony. Zobacz dziennik BepInEx."
+    },
+    {
+      "key": "ui.badge.restart_required",
+      "value": "Wymaga restartu"
+    },
+    {
+      "key": "ui.badge.live_apply",
+      "value": "Działa od razu"
+    },
+    {
+      "key": "ui.badge.advanced",
+      "value": "Zaawansowane"
+    },
+    {
+      "key": "ui.badge.hidden",
+      "value": "Ukryte"
+    },
+    {
+      "key": "ui.badge.dangerous",
+      "value": "Niebezpieczne"
+    }
+  ]
+}

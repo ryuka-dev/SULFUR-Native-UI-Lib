@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "key": "ui.message.warning_prefix",
+      "value": "تحذير: "
+    },
+    {
+      "key": "ui.message.error_prefix",
+      "value": "خطأ: "
+    },
+    {
+      "key": "ui.message.success_prefix",
+      "value": "تم: "
+    },
+    {
+      "key": "ui.input.placeholder",
+      "value": "أدخل نصًا..."
+    },
+    {
+      "key": "ui.page.no_options",
+      "value": "لا توجد خيارات."
+    },
+    {
+      "key": "ui.badge.dirty",
+      "value": "معلّق"
+    },
+    {
+      "key": "ui.badge.clean",
+      "value": "دون تغيير"
+    },
+    {
+      "key": "ui.button.default",
+      "value": "الافتراضي"
+    },
+    {
+      "key": "ui.footer.apply",
+      "value": "تطبيق"
+    },
+    {
+      "key": "ui.foldout.mod_tag",
+      "value": "مود"
+    },
+    {
+      "key": "ui.input.number_placeholder",
+      "value": "أدخل رقمًا..."
+    },
+    {
+      "key": "ui.page.load_failed",
+      "value": "تعذّر تحميل هذه الصفحة. راجع سجل BepInEx."
+    },
+    {
+      "key": "ui.badge.restart_required",
+      "value": "يتطلب إعادة التشغيل"
+    },
+    {
+      "key": "ui.badge.live_apply",
+      "value": "تطبيق فوري"
+    },
+    {
+      "key": "ui.badge.advanced",
+      "value": "متقدم"
+    },
+    {
+      "key": "ui.badge.hidden",
+      "value": "مخفي"
+    },
+    {
+      "key": "ui.badge.dangerous",
+      "value": "خطير"
+    }
+  ]
+}

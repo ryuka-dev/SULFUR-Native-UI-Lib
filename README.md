@@ -4,7 +4,7 @@ Native OptionsScreen integration library for SULFUR BepInEx mods.
 
 This library lets external BepInEx mods register custom pages inside the game's native Options screen and build UI using the game's existing OptionsScreen style.
 
-Current target version: `0.10.1+`
+Current target version: `0.11.0+`
 
 The current development standard focuses on large custom Options pages, especially in-game config editor pages. The main design rule is:
 
@@ -31,6 +31,8 @@ Use row handles for local updates and themed groups for section-level visual gro
   while the page is open without rebuilding it.
 - Automatic missing-glyph fallback (CJK + symbols) so non-Latin and symbol
   characters render even when the game's active font lacks them.
+- Fonts by role (`SulfurFonts`) — the game's own per-language fonts for text a mod
+  builds itself, kept in sync when the player changes language.
 
 ---
 

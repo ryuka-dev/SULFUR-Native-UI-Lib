@@ -19,11 +19,14 @@ namespace Ryuka.Sulfur.NativeUI
         // Above virtually all game UI; the vanilla HUD canvases sit far below this.
         private const int OverlaySortingOrder = 32000;
 
+        // The game's centred HUD alerts (LocationAlert, SmallerAlert) use SerifBold.
+        private const SulfurFontRole LabelRole = SulfurFontRole.SerifBold;
+        private const float LabelFontSize = 34f;
+
         private static SulfurPopupController instance;
 
         private GameObject bannerRoot;     // toggled active/inactive to show/hide
         private TextMeshProUGUI label;
-        private bool fontResolved;         // true once we adopt a live, localized game font
 
         /// <summary>Live instance, bootstrapping one on first access.</summary>
         public static SulfurPopupController Instance
@@ -65,9 +68,9 @@ namespace Ryuka.Sulfur.NativeUI
 
             label.text = text ?? "";
 
-            // Font may only become resolvable once the game's localized HUD exists.
-            // Cheap to retry on each show until we lock onto a language-correct font.
-            EnsureFont();
+            // Re-bind on every show: cheap, and upgrades the font if the game's language
+            // assets were still loading when the banner was built.
+            SulfurFonts.Bind(label, LabelRole);
 
             if (bannerRoot != null && !bannerRoot.activeSelf)
                 bannerRoot.SetActive(true);
@@ -145,7 +148,7 @@ namespace Ryuka.Sulfur.NativeUI
             label.raycastTarget = false;
             label.textWrappingMode = TextWrappingModes.NoWrap;
             label.overflowMode = TextOverflowModes.Overflow;
-            label.fontSize = 34f;
+            label.fontSize = LabelFontSize;
             label.color = SulfurUiTheme.TextPrimary;
 
             // Thin amber rules above and below the text — SULFUR's UI leans on this
@@ -153,7 +156,7 @@ namespace Ryuka.Sulfur.NativeUI
             CreateAccentLine("TopAccent", true);
             CreateAccentLine("BottomAccent", false);
 
-            EnsureFont();
+            SulfurFonts.Bind(label, LabelRole);
 
             // Hidden until the first ShowBanner.
             bannerRoot.SetActive(false);
@@ -189,33 +192,6 @@ namespace Ryuka.Sulfur.NativeUI
             image.raycastTarget = false;
 
             return image;
-        }
-
-        /// <summary>
-        /// Adopt the game's current, language-correct TMP font for the label. The
-        /// game swaps its font asset per language (e.g. a CJK-capable asset for
-        /// Chinese); sampling a live HUD text keeps the banner from rendering as
-        /// blank boxes in non-Latin languages. Falls back to the TMP default font
-        /// without locking in, so a later show can still upgrade to the real font.
-        /// </summary>
-        private void EnsureFont()
-        {
-            if (fontResolved || label == null)
-                return;
-
-            TextMeshProUGUI sample = SulfurUiFont.FindLiveGameText(transform);
-            if (sample != null && sample.font != null)
-            {
-                label.font = sample.font;
-                label.fontSharedMaterial = sample.fontSharedMaterial;
-                label.fontSize = Mathf.Clamp(sample.fontSize * 1.1f, 28f, 48f);
-                fontResolved = true;
-                return;
-            }
-
-            // Temporary fallback: readable now, retried (and replaced) on next show.
-            if (label.font == null && TMP_Settings.defaultFontAsset != null)
-                label.font = TMP_Settings.defaultFontAsset;
         }
     }
 }

@@ -3,6 +3,9 @@
 ###############################################################################
 * text=auto
 
+# Language files are read byte-for-byte by every SULFUR mod: keep them LF.
+lang/*.json text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

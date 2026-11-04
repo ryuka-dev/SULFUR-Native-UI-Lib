@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "key": "ui.message.warning_prefix",
+      "value": "경고: "
+    },
+    {
+      "key": "ui.message.error_prefix",
+      "value": "오류: "
+    },
+    {
+      "key": "ui.message.success_prefix",
+      "value": "확인: "
+    },
+    {
+      "key": "ui.input.placeholder",
+      "value": "텍스트 입력..."
+    },
+    {
+      "key": "ui.page.no_options",
+      "value": "옵션이 없습니다."
+    },
+    {
+      "key": "ui.badge.dirty",
+      "value": "대기 중"
+    },
+    {
+      "key": "ui.badge.clean",
+      "value": "변경 없음"
+    },
+    {
+      "key": "ui.button.default",
+      "value": "기본값"
+    },
+    {
+      "key": "ui.footer.apply",
+      "value": "적용"
+    },
+    {
+      "key": "ui.foldout.mod_tag",
+      "value": "모드"
+    },
+    {
+      "key": "ui.input.number_placeholder",
+      "value": "숫자 입력..."
+    },
+    {
+      "key": "ui.page.load_failed",
+      "value": "이 페이지를 불러오지 못했습니다. BepInEx 로그를 확인하세요."
+    },
+    {
+      "key": "ui.badge.restart_required",
+      "value": "재시작 필요"
+    },
+    {
+      "key": "ui.badge.live_apply",
+      "value": "즉시 적용"
+    },
+    {
+      "key": "ui.badge.advanced",
+      "value": "고급"
+    },
+    {
+      "key": "ui.badge.hidden",
+      "value": "숨김"
+    },
+    {
+      "key": "ui.badge.dangerous",
+      "value": "위험"
+    }
+  ]
+}

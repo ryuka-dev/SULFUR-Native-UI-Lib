@@ -5,7 +5,6 @@ using PerfectRandom.Sulfur.Core;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Ryuka.Sulfur.NativeUI
@@ -25,9 +24,20 @@ namespace Ryuka.Sulfur.NativeUI
         private readonly List<OptionsScreenOption> nativeOptions;
         private readonly string pageId;
 
+        // The role the game's own options screen and option rows use.
+        internal const SulfurFontRole OptionsFontRole = SulfurFontRole.SerifRegular;
+
+        // Size/colour used when no option prefab is available to sample (matches the
+        // defaults the row builders use for a missing sample).
+        private const float FallbackSampleFontSize = 22f;
+
         private TextMeshProUGUI sampleTextCache;
         private bool sampleTextCacheInitialized;
         private float nativeOptionWidthCache = -1f;
+
+        // Set by the options bridge when this context's page stops being the page on screen.
+        private bool invalidated;
+        private bool deadUseLogged;
 
         internal SulfurOptionsContext(
             OptionsScreen optionsScreen,
@@ -57,8 +67,54 @@ namespace Ryuka.Sulfur.NativeUI
             get { return pageId; }
         }
 
+        /// <summary>
+        /// True while this context's page is the page on screen. It turns false for good when
+        /// the page is rebuilt (<see cref="Rebuild"/>, a foldout), another category is shown,
+        /// or the options screen is hidden; every build gets a new context. On a context that
+        /// is no longer alive, <see cref="Rebuild"/>, <see cref="SetFooter"/>,
+        /// <see cref="SetFooterStatus"/> and <see cref="ClearFooter"/> do nothing, and the
+        /// <c>Add*</c> methods add nothing (they return null, or an inert handle where they
+        /// return a handle) and log one warning per context.
+        /// </summary>
+        public bool IsAlive
+        {
+            get { return !invalidated && optionsScreen != null && rootOptionsContainer != null; }
+        }
+
+        internal void Invalidate()
+        {
+            invalidated = true;
+        }
+
+        // Guard for the methods that write rows. The root container is the screen's single
+        // options container, shared by every page, so a stale context would otherwise write
+        // into whatever page is showing now.
+        internal bool EnsureAlive(string operation)
+        {
+            if (IsAlive)
+                return true;
+
+            if (!deadUseLogged)
+            {
+                deadUseLogged = true;
+
+                if (Plugin.Log != null)
+                {
+                    Plugin.Log.LogWarning(
+                        "SULFUR Native UI: " + operation + " was called on the options context of page '" + pageId +
+                        "' after that page was closed or rebuilt; ignored. Use the context passed to the current " +
+                        "BuildPage call (see SulfurOptionsContext.IsAlive). Further calls on this context are ignored silently.");
+                }
+            }
+
+            return false;
+        }
+
         public void Rebuild()
         {
+            if (!IsAlive || !optionsScreen.IsShown)
+                return;
+
             SulfurOptionsScreenBridge.RebuildCurrentCustomPage(optionsScreen);
         }
 
@@ -68,6 +124,9 @@ namespace Ryuka.Sulfur.NativeUI
             string primaryButtonText,
             Action onPrimaryPressed)
         {
+            if (!IsAlive)
+                return;
+
             SulfurOptionsScreenBridge.SetCustomPageFooter(
                 optionsScreen,
                 leftText,
@@ -78,6 +137,9 @@ namespace Ryuka.Sulfur.NativeUI
 
         public void SetFooterStatus(string statusText)
         {
+            if (!IsAlive)
+                return;
+
             SulfurOptionsScreenBridge.SetCustomPageFooterStatus(optionsScreen, statusText);
         }
 
@@ -91,76 +153,11 @@ namespace Ryuka.Sulfur.NativeUI
             return BeginThemedGroup(name, color, 32f);
         }
 
-        //public IDisposable BeginThemedGroup(string name, Color themeColor, float indentPixels)
-        //{
-        //    RectTransform parent = OptionsContainer;
-        //    if (parent == null)
-        //        return new SulfurContainerScope(this, null, false);
-
-        //    float leftInset = indentPixels;
-        //    float rightInset = 6f;
-
-        //    GameObject group = new GameObject(
-        //        string.IsNullOrWhiteSpace(name) ? "SULFUR_ThemedGroup" : name,
-        //        typeof(RectTransform),
-        //        typeof(CanvasRenderer),
-        //        typeof(Image),
-        //        typeof(VerticalLayoutGroup),
-        //        typeof(ContentSizeFitter));
-
-        //    group.transform.SetParent(parent, false);
-
-        //    RectTransform rt = group.GetComponent<RectTransform>();
-        //    rt.anchorMin = new Vector2(0f, 1f);
-        //    rt.anchorMax = new Vector2(1f, 1f);
-        //    rt.pivot = new Vector2(0.5f, 1f);
-        //    rt.anchoredPosition = Vector2.zero;
-        //    rt.offsetMin = new Vector2(leftInset, 0f);
-        //    rt.offsetMax = new Vector2(-rightInset, 0f);
-
-        //    Image image = group.GetComponent<Image>();
-        //    image.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.018f);
-        //    image.raycastTarget = false;
-
-        //    VerticalLayoutGroup layout = group.GetComponent<VerticalLayoutGroup>();
-        //    layout.padding = new RectOffset(18, 14, 10, 12);
-        //    layout.spacing = 6f;
-        //    layout.childAlignment = TextAnchor.UpperLeft;
-        //    layout.childControlWidth = true;
-        //    layout.childControlHeight = false;
-        //    layout.childForceExpandWidth = true;
-        //    layout.childForceExpandHeight = false;
-
-        //    ContentSizeFitter fitter = group.GetComponent<ContentSizeFitter>();
-        //    fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-        //    fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        //    Color borderColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.68f);
-
-        //    //CreateBorderLine(group.transform, "BorderLeft", borderColor,
-        //    //    new Vector2(0f, 0f), new Vector2(0f, 1f),
-        //    //    new Vector2(0f, 0f), new Vector2(2f, 0f));
-
-        //    //CreateBorderLine(group.transform, "BorderRight", borderColor,
-        //    //    new Vector2(1f, 0f), new Vector2(1f, 1f),
-        //    //    new Vector2(-2f, 0f), new Vector2(0f, 0f));
-
-        //    //CreateBorderLine(group.transform, "BorderTop", borderColor,
-        //    //    new Vector2(0f, 1f), new Vector2(1f, 1f),
-        //    //    new Vector2(0f, -2f), new Vector2(0f, 0f));
-
-        //    //CreateBorderLine(group.transform, "BorderBottom", borderColor,
-        //    //    new Vector2(0f, 0f), new Vector2(1f, 0f),
-        //    //    new Vector2(0f, 0f), new Vector2(0f, 2f));
-
-        //    containerStack.Push(currentOptionsContainer);
-        //    currentOptionsContainer = rt;
-
-        //    return new SulfurContainerScope(this, rt, true);
-        //}
-
         public IDisposable BeginThemedGroup(string name, Color themeColor, float indentPixels)
         {
+            if (!EnsureAlive("BeginThemedGroup"))
+                return new SulfurContainerScope(this, null, false);
+
             RectTransform parent = OptionsContainer;
             if (parent == null)
                 return new SulfurContainerScope(this, null, false);
@@ -356,13 +353,18 @@ namespace Ryuka.Sulfur.NativeUI
 
         public void ClearFooter()
         {
+            if (!IsAlive)
+                return;
+
             SulfurOptionsScreenBridge.ClearCustomPageFooter(optionsScreen);
         }
 
         public OptionsScreenOption AddButton(string label, Action onPressed)
         {
-            GameObject prefab = SulfurOptionsScreenBridge.GetOptionButtonPrefab(optionsScreen);
-            OptionsScreenOption option = InstantiateOption(prefab);
+            if (!EnsureAlive("AddButton"))
+                return null;
+
+            OptionsScreenOption option = InstantiateButtonOption();
 
             option.SetLabel(label ?? "");
 
@@ -388,29 +390,91 @@ namespace Ryuka.Sulfur.NativeUI
 
         public OptionsScreenOption AddInfo(string label)
         {
-            GameObject prefab = SulfurOptionsScreenBridge.GetOptionInfoPrefab(optionsScreen);
-            if (prefab == null)
-                prefab = SulfurOptionsScreenBridge.GetOptionButtonPrefab(optionsScreen);
+            if (!EnsureAlive("AddInfo"))
+                return null;
 
-            OptionsScreenOption option = InstantiateOption(prefab);
+            return AddInfoRow(label, true);
+        }
+
+        // register: false for a label that belongs to a widget below it (a stacked input),
+        // whose own navigation proxy is the row keyboard/gamepad focus lands on.
+        private OptionsScreenOption AddInfoRow(string label, bool register)
+        {
+            GameObject prefab = SulfurOptionsScreenBridge.GetOptionInfoPrefab(optionsScreen);
+            OptionsScreenOption option = prefab != null
+                ? InstantiateOption(prefab)
+                : InstantiateButtonOption();
             option.SetLabel(label ?? "");
-            RegisterOption(option);
+
+            if (register)
+                RegisterOption(option);
+
             return option;
         }
 
         public OptionsScreenOption AddToggle(string label, bool value, Action<bool> onChanged)
+        {
+            if (!EnsureAlive("AddToggle"))
+                return null;
+
+            UIToggle toggle;
+            SulfurOptionBinding binding;
+            return BuildToggleOption(label, value, onChanged, out toggle, out binding);
+        }
+
+        public OptionsScreenOption AddToggle(string label, string description, bool value, Action<bool> onChanged)
+        {
+            OptionsScreenOption option = AddToggle(label, value, onChanged);
+            AddDescription(description);
+            return option;
+        }
+
+        /// <summary>
+        /// Adds a native checkbox row, like <see cref="AddToggle(string, bool, Action{bool})"/>,
+        /// and returns a live handle: read the value, set it without raising
+        /// <paramref name="onChanged"/>, lock, hide or relabel the row in place.
+        /// </summary>
+        public SulfurToggleHandle AddToggleRow(string label, bool value, Action<bool> onChanged)
+        {
+            return AddToggleRow(label, null, value, onChanged);
+        }
+
+        /// <summary>As <see cref="AddToggleRow(string, bool, Action{bool})"/>, with a description row below.</summary>
+        public SulfurToggleHandle AddToggleRow(string label, string description, bool value, Action<bool> onChanged)
+        {
+            if (!EnsureAlive("AddToggleRow"))
+                return new SulfurToggleHandle(null, null);
+
+            UIToggle toggle;
+            SulfurOptionBinding binding;
+            OptionsScreenOption option = BuildToggleOption(label, value, onChanged, out toggle, out binding);
+            GameObject descriptionRow = AddDescriptionRow(description);
+
+            return new SulfurToggleHandle(new SulfurOptionRowParts(this, option, binding, descriptionRow), toggle);
+        }
+
+        private OptionsScreenOption BuildToggleOption(
+            string label,
+            bool value,
+            Action<bool> onChanged,
+            out UIToggle toggle,
+            out SulfurOptionBinding binding)
         {
             GameObject prefab = SulfurOptionsScreenBridge.GetOptionBoolPrefab(optionsScreen);
             OptionsScreenOption option = InstantiateOption(prefab);
 
             option.SetLabel(label ?? "");
 
-            UIToggle toggle = option.GetComponentInChildren<UIToggle>(true);
+            // The binding owns the listener so it survives the row being hidden and shown.
+            binding = option.gameObject.AddComponent<SulfurOptionBinding>();
+
+            toggle = option.GetComponentInChildren<UIToggle>(true);
             if (toggle != null)
             {
                 toggle.SetIsOnWithoutNotify(value);
                 toggle.onValueChanged.RemoveAllListeners();
-                toggle.onValueChanged.AddListener(new UnityAction<bool>(delegate (bool state)
+
+                binding.BindToggle(toggle, new UnityAction<bool>(delegate (bool state)
                 {
                     if (onChanged != null)
                         onChanged(state);
@@ -423,18 +487,57 @@ namespace Ryuka.Sulfur.NativeUI
             return option;
         }
 
-        public OptionsScreenOption AddToggle(string label, string description, bool value, Action<bool> onChanged)
-        {
-            OptionsScreenOption option = AddToggle(label, value, onChanged);
-            AddDescription(description);
-            return option;
-        }
-
         public OptionsScreenOption AddCycle(
             string label,
             IReadOnlyList<string> values,
             int currentIndex,
             Action<int, string> onChanged)
+        {
+            if (!EnsureAlive("AddCycle"))
+                return null;
+
+            SulfurOptionBinding binding;
+            return BuildCycleOption(label, values, currentIndex, onChanged, out binding);
+        }
+
+        /// <summary>
+        /// Adds a native alternative ("&lt; value &gt;") row, like
+        /// <see cref="AddCycle(string, IReadOnlyList{string}, int, Action{int, string})"/>, and
+        /// returns a live handle.
+        /// </summary>
+        public SulfurCycleHandle AddCycleRow(
+            string label,
+            IReadOnlyList<string> values,
+            int currentIndex,
+            Action<int, string> onChanged)
+        {
+            return AddCycleRow(label, null, values, currentIndex, onChanged);
+        }
+
+        /// <summary>As <see cref="AddCycleRow(string, IReadOnlyList{string}, int, Action{int, string})"/>, with a description row below.</summary>
+        public SulfurCycleHandle AddCycleRow(
+            string label,
+            string description,
+            IReadOnlyList<string> values,
+            int currentIndex,
+            Action<int, string> onChanged)
+        {
+            if (!EnsureAlive("AddCycleRow"))
+                return new SulfurCycleHandle(null);
+
+            SulfurOptionBinding binding;
+            OptionsScreenOption option = BuildCycleOption(label, values, currentIndex, onChanged, out binding);
+            GameObject descriptionRow = AddDescriptionRow(description);
+
+            return new SulfurCycleHandle(new SulfurOptionRowParts(this, option, binding, descriptionRow));
+        }
+
+        private OptionsScreenOption BuildCycleOption(
+            string label,
+            IReadOnlyList<string> values,
+            int currentIndex,
+            Action<int, string> onChanged,
+            out SulfurOptionBinding binding)
         {
             GameObject prefab = SulfurOptionsScreenBridge.GetOptionAlternativePrefab(optionsScreen);
             OptionsScreenOption option = InstantiateOption(prefab);
@@ -454,7 +557,7 @@ namespace Ryuka.Sulfur.NativeUI
             if (altText != null)
                 altText.text = safeValues[index];
 
-            SulfurOptionBinding binding = option.gameObject.AddComponent<SulfurOptionBinding>();
+            binding = option.gameObject.AddComponent<SulfurOptionBinding>();
             binding.CycleValues = safeValues;
             binding.CycleIndex = index;
             binding.CycleLabel = altText;
@@ -491,44 +594,13 @@ namespace Ryuka.Sulfur.NativeUI
             float step,
             Action<float> onChanged)
         {
-            GameObject prefab = SulfurOptionsScreenBridge.GetOptionSliderPrefab(optionsScreen);
-            OptionsScreenOption option = InstantiateOption(prefab);
+            if (!EnsureAlive("AddSlider"))
+                return null;
 
-            option.SetLabel(label ?? "");
-
-            UISlider slider = option.GetComponentInChildren<UISlider>(true);
-            UIText valueText = SulfurOptionsScreenBridge.GetSliderValueText(option);
-
-            if (slider != null)
-            {
-                slider.minValue = min;
-                slider.maxValue = max;
-                slider.SetValueWithoutNotify(Mathf.Clamp(value, min, max));
-
-                SetSliderText(valueText, slider.value);
-
-                slider.onValueChanged.RemoveAllListeners();
-                slider.onValueChanged.AddListener(new UnityAction<float>(delegate (float v)
-                {
-                    SetSliderText(valueText, v);
-
-                    if (onChanged != null)
-                        onChanged(v);
-                }));
-            }
-
-            SulfurOptionBinding binding = option.gameObject.AddComponent<SulfurOptionBinding>();
-            binding.OnHorizontal = delegate (int delta)
-            {
-                if (slider == null)
-                    return;
-
-                float actualStep = step > 0f ? step : (max - min) / 20f;
-                slider.value = Mathf.Clamp(slider.value + actualStep * delta, min, max);
-            };
-
-            RegisterOption(option);
-            return option;
+            UISlider slider;
+            UIText valueText;
+            SulfurOptionBinding binding;
+            return BuildSliderOption(label, value, min, max, step, onChanged, false, out slider, out valueText, out binding);
         }
 
         public OptionsScreenOption AddSlider(
@@ -542,6 +614,103 @@ namespace Ryuka.Sulfur.NativeUI
         {
             OptionsScreenOption option = AddSlider(label, value, min, max, step, onChanged);
             AddDescription(description);
+            return option;
+        }
+
+        /// <summary>
+        /// Adds a native slider row, like
+        /// <see cref="AddSlider(string, float, float, float, float, Action{float})"/>, and
+        /// returns a live handle. Unlike <c>AddSlider</c>, mouse drags snap to
+        /// <paramref name="step"/> (when it is &gt; 0) the way left/right does, and
+        /// <paramref name="onChanged"/> fires only when the snapped value changes.
+        /// </summary>
+        public SulfurSliderHandle AddSliderRow(
+            string label,
+            float value,
+            float min,
+            float max,
+            float step,
+            Action<float> onChanged)
+        {
+            return AddSliderRow(label, null, value, min, max, step, onChanged);
+        }
+
+        /// <summary>As <see cref="AddSliderRow(string, float, float, float, float, Action{float})"/>, with a description row below.</summary>
+        public SulfurSliderHandle AddSliderRow(
+            string label,
+            string description,
+            float value,
+            float min,
+            float max,
+            float step,
+            Action<float> onChanged)
+        {
+            if (!EnsureAlive("AddSliderRow"))
+                return new SulfurSliderHandle(null, null, null);
+
+            UISlider slider;
+            UIText valueText;
+            SulfurOptionBinding binding;
+            OptionsScreenOption option = BuildSliderOption(label, value, min, max, step, onChanged, true, out slider, out valueText, out binding);
+            GameObject descriptionRow = AddDescriptionRow(description);
+
+            return new SulfurSliderHandle(new SulfurOptionRowParts(this, option, binding, descriptionRow), slider, valueText);
+        }
+
+        private OptionsScreenOption BuildSliderOption(
+            string label,
+            float value,
+            float min,
+            float max,
+            float step,
+            Action<float> onChanged,
+            bool snapDrags,
+            out UISlider slider,
+            out UIText valueText,
+            out SulfurOptionBinding binding)
+        {
+            GameObject prefab = SulfurOptionsScreenBridge.GetOptionSliderPrefab(optionsScreen);
+            OptionsScreenOption option = InstantiateOption(prefab);
+
+            option.SetLabel(label ?? "");
+
+            UISlider rowSlider = option.GetComponentInChildren<UISlider>(true);
+            UIText rowValueText = SulfurOptionsScreenBridge.GetSliderValueText(option);
+            slider = rowSlider;
+            valueText = rowValueText;
+
+            binding = option.gameObject.AddComponent<SulfurOptionBinding>();
+
+            if (rowSlider != null)
+            {
+                rowSlider.minValue = min;
+                rowSlider.maxValue = max;
+                rowSlider.SetValueWithoutNotify(Mathf.Clamp(value, min, max));
+
+                SetSliderText(rowValueText, rowSlider.value);
+
+                rowSlider.onValueChanged.RemoveAllListeners();
+
+                // The binding owns the listener so it survives the row being hidden and shown.
+                binding.BindSlider(rowSlider, new UnityAction<float>(delegate (float v)
+                {
+                    SetSliderText(rowValueText, v);
+
+                    if (onChanged != null)
+                        onChanged(v);
+                }), snapDrags ? step : 0f);
+            }
+
+            binding.OnHorizontal = delegate (int delta)
+            {
+                if (rowSlider == null)
+                    return;
+
+                float actualStep = step > 0f ? step : (max - min) / 20f;
+                rowSlider.value = Mathf.Clamp(rowSlider.value + actualStep * delta, min, max);
+            };
+
+            RegisterOption(option);
             return option;
         }
 
@@ -835,10 +1004,10 @@ namespace Ryuka.Sulfur.NativeUI
                 sampleTextCache = ResolveSampleText();
             }
 
-            // Attach the CJK fallback to the exact font our custom rows render with. The
-            // game's per-language font (e.g. the Chinese Noto subset) is missing some
-            // glyphs (拟, ✓, ○, ...) and the global fallback list isn't reliably consulted
-            // for it, so wire the fallback onto the font asset itself. Idempotent.
+            // Fonts from SulfurFonts already carry the fallback; this also covers the prefab
+            // font when no role font is available. The game's Chinese subset font lacks some
+            // glyphs (拟, ✓, ○, ...) and TMP's global fallback list is cleared by the game, so
+            // the fallback must sit on the font asset itself. Idempotent.
             if (sampleTextCache != null)
                 SulfurFontFallback.EnsureFontHasFallback(sampleTextCache.font);
 
@@ -849,103 +1018,43 @@ namespace Ryuka.Sulfur.NativeUI
         {
             // Stable base for size/color: sample from an option prefab. The prefab is
             // never restyled, so its font size is always the true native base. Scanning
-            // the container for size is unsafe: on Rebuild(), the previous build's custom
-            // rows are still present this frame (Object.Destroy is deferred) and have
-            // already been shrunk by the compact styling, so using them as the base makes
-            // fonts shrink on every rebuild. See SulfurOptionsScreenBridge.BuildCustomPage.
-            TextMeshProUGUI prefabSample = FindPrefabSampleText();
+            // the container for size is unsafe: rows already built have been shrunk by the
+            // compact styling, so using them as the base makes fonts shrink on every
+            // rebuild. See SulfurOptionsScreenBridge.BuildCustomPage.
+            TextMeshProUGUI prefabSample = SulfurOptionsScreenBridge.FindOptionPrefabSampleText(optionsScreen);
 
-            // Language font: the option prefab keeps the game's default (Latin) font
-            // asset, so non-English glyphs (CJK, Cyrillic, ...) are missing and custom
-            // rows render as blank boxes. The game applies a per-language font asset +
-            // material to its own live, localized chrome (category tabs, headers). Sample
-            // that so custom rows follow the active language instead of the prefab font.
-            TextMeshProUGUI liveLanguageSample = FindLiveLanguageText();
+            // Font: the option prefab keeps the game's default (Latin) font asset — the
+            // game only swaps it per language on instantiated rows, through FontLocalizer.
+            // Take the same role font the game gives its option rows, so custom rows match
+            // native ones in every language.
+            TMP_FontAsset roleFont = SulfurFonts.Get(OptionsFontRole);
 
-            if (prefabSample == null)
-                return liveLanguageSample;
-
-            if (liveLanguageSample == null || liveLanguageSample.font == prefabSample.font)
+            if (roleFont == null || (prefabSample != null && prefabSample.font == roleFont))
                 return prefabSample;
 
-            // Prefab and live text use different font assets (the game swapped fonts for
-            // the current language). Combine the prefab's stable size/color with the live
-            // language font/material into a single detached sample, so every call site can
-            // keep reading one component and gets both correct size and correct glyphs.
-            return BuildLanguageSample(prefabSample, liveLanguageSample);
+            // Combine the prefab's stable size/color with the role font into one detached
+            // sample, so every call site keeps reading one component and gets both.
+            return BuildStyleSample(prefabSample, roleFont);
         }
 
-        private TextMeshProUGUI FindLiveLanguageText()
-        {
-            if (optionsScreen == null)
-                return null;
-
-            TextMeshProUGUI[] texts = optionsScreen.GetComponentsInChildren<TextMeshProUGUI>(true);
-            if (texts == null)
-                return null;
-
-            RectTransform container = OptionsContainer;
-
-            foreach (TextMeshProUGUI text in texts)
-            {
-                if (text == null || text.font == null)
-                    continue;
-
-                // Skip our own custom rows (inside the options container). Only the game's
-                // native chrome is reliably localized to the current language font.
-                if (container != null && text.transform.IsChildOf(container))
-                    continue;
-
-                return text;
-            }
-
-            return null;
-        }
-
-        private TextMeshProUGUI BuildLanguageSample(TextMeshProUGUI sizeSource, TextMeshProUGUI fontSource)
+        private TextMeshProUGUI BuildStyleSample(TextMeshProUGUI sizeSource, TMP_FontAsset font)
         {
             // Detached, inactive holder: never laid out or rendered, destroyed with the
             // page on the next rebuild. It only carries style values for the call sites.
+            // Parented to the page root, not the current container: the sample is cached
+            // for the whole page, and a list container would destroy it on its next refresh.
             GameObject go = new GameObject("SulfurStyleSample", typeof(RectTransform), typeof(TextMeshProUGUI));
-            go.transform.SetParent(OptionsContainer, false);
+            go.transform.SetParent(rootOptionsContainer, false);
             go.SetActive(false);
 
             TextMeshProUGUI tmp = go.GetComponent<TextMeshProUGUI>();
-            tmp.font = fontSource.font;
-            tmp.fontSharedMaterial = fontSource.fontSharedMaterial;
-            tmp.fontSize = sizeSource.fontSize;
-            tmp.color = sizeSource.color;
+            tmp.font = font;
+            if (font.material != null)
+                tmp.fontSharedMaterial = font.material;
+            tmp.fontSize = sizeSource != null ? sizeSource.fontSize : FallbackSampleFontSize;
+            tmp.color = sizeSource != null ? sizeSource.color : Color.white;
 
             return tmp;
-        }
-
-        private TextMeshProUGUI FindPrefabSampleText()
-        {
-            if (optionsScreen == null)
-                return null;
-
-            GameObject[] prefabs =
-            {
-                SulfurOptionsScreenBridge.GetOptionButtonPrefab(optionsScreen),
-                SulfurOptionsScreenBridge.GetOptionInfoPrefab(optionsScreen),
-                SulfurOptionsScreenBridge.GetOptionBoolPrefab(optionsScreen),
-                SulfurOptionsScreenBridge.GetOptionAlternativePrefab(optionsScreen)
-            };
-
-            foreach (GameObject prefab in prefabs)
-            {
-                if (prefab == null)
-                    continue;
-
-                TextMeshProUGUI[] texts = prefab.GetComponentsInChildren<TextMeshProUGUI>(true);
-                foreach (TextMeshProUGUI text in texts)
-                {
-                    if (text != null && text.font != null)
-                        return text;
-                }
-            }
-
-            return null;
         }
 
         private void ApplyNativeRowRect(RectTransform rectTransform, float height)
@@ -1018,7 +1127,7 @@ namespace Ryuka.Sulfur.NativeUI
 
         public void AddSection(string label)
         {
-            if (string.IsNullOrWhiteSpace(label))
+            if (string.IsNullOrWhiteSpace(label) || !EnsureAlive("AddSection"))
                 return;
 
             GameObject row = new GameObject(
@@ -1100,9 +1209,22 @@ namespace Ryuka.Sulfur.NativeUI
             line.raycastTarget = false;
         }
 
+        /// <summary>Adds a dimmed, wrapping description row ("— " prefixed).</summary>
+        /// <returns>
+        /// Always null for now: the row is not a native option row. The return type is kept
+        /// for binary compatibility with mods compiled against earlier versions.
+        /// </returns>
         public OptionsScreenOption AddDescription(string text)
         {
-            if (string.IsNullOrWhiteSpace(text))
+            AddDescriptionRow(text);
+            return null;
+        }
+
+        // The description row itself, for handles that show/hide it with their row; null
+        // when nothing was added.
+        private GameObject AddDescriptionRow(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text) || !EnsureAlive("AddDescription"))
                 return null;
 
             GameObject row = new GameObject("Description", typeof(RectTransform), typeof(LayoutElement));
@@ -1147,7 +1269,7 @@ namespace Ryuka.Sulfur.NativeUI
                 label.color = new Color(1f, 1f, 1f, 0.58f);
             }
 
-            return null;
+            return row;
         }
 
         // A plain, full-opacity text row that returns a live handle. Unlike
@@ -1156,6 +1278,9 @@ namespace Ryuka.Sulfur.NativeUI
         // handle and call SetText/SetColor/SetVisible without a full Rebuild.
         public SulfurTextHandle AddTextRow(string text)
         {
+            if (!EnsureAlive("AddTextRow"))
+                return new SulfurTextHandle(null, null);
+
             GameObject row = new GameObject("SULFUR_TextRow", typeof(RectTransform), typeof(LayoutElement));
             row.transform.SetParent(OptionsContainer, false);
 
@@ -1218,7 +1343,7 @@ namespace Ryuka.Sulfur.NativeUI
 
         public void AddMessage(string text, SulfurMessageKind kind)
         {
-            if (string.IsNullOrWhiteSpace(text))
+            if (string.IsNullOrWhiteSpace(text) || !EnsureAlive("AddMessage"))
                 return;
 
             GameObject row = new GameObject("SULFUR_Message_" + kind, typeof(RectTransform), typeof(LayoutElement), typeof(CanvasRenderer), typeof(Image));
@@ -1284,7 +1409,7 @@ namespace Ryuka.Sulfur.NativeUI
 
         public void AddBadgeRow(IReadOnlyList<string> badges)
         {
-            if (badges == null || badges.Count == 0)
+            if (badges == null || badges.Count == 0 || !EnsureAlive("AddBadgeRow"))
                 return;
 
             GameObject row = new GameObject("SULFUR_BadgeRow", typeof(RectTransform), typeof(LayoutElement), typeof(HorizontalLayoutGroup));
@@ -1317,7 +1442,7 @@ namespace Ryuka.Sulfur.NativeUI
 
         public void AddDefaultButton(Action onPressed)
         {
-            AddSmallButton("Default", onPressed);
+            AddSmallButton(SulfurUiText.DefaultButton, onPressed);
         }
 
         public void AddSmallButton(string label, Action onPressed)
@@ -1327,7 +1452,10 @@ namespace Ryuka.Sulfur.NativeUI
 
         public void AddSmallButton(string label, Action onPressed, float minWidth)
         {
-            string safeLabel = string.IsNullOrWhiteSpace(label) ? "Default" : label;
+            if (!EnsureAlive("AddSmallButton"))
+                return;
+
+            string safeLabel = string.IsNullOrWhiteSpace(label) ? SulfurUiText.DefaultButton : label;
             float buttonWidth = minWidth > 0f ? minWidth : CalculateSmallButtonWidth(safeLabel);
 
             GameObject row = new GameObject("SULFUR_SmallButtonRow", typeof(RectTransform), typeof(LayoutElement), typeof(HorizontalLayoutGroup));
@@ -1358,6 +1486,11 @@ namespace Ryuka.Sulfur.NativeUI
 
             UIButton button = CreateSmallButton(row.transform, safeLabel, onPressed);
             ApplySmallButtonWidth(button, buttonWidth);
+
+            RegisterNavigationProxy(rowRt, delegate
+            {
+                SulfurNavigationProxy.Press(button);
+            });
         }
 
         // Applies an explicit pixel width to a small button. The button rows use
@@ -1406,7 +1539,7 @@ namespace Ryuka.Sulfur.NativeUI
 
         public IReadOnlyList<SulfurButtonHandle> AddButtonRow(IReadOnlyList<SulfurButton> buttons)
         {
-            if (buttons == null || buttons.Count == 0)
+            if (buttons == null || buttons.Count == 0 || !EnsureAlive("AddButtonRow"))
                 return Array.Empty<SulfurButtonHandle>();
 
             List<SulfurButton> valid = new List<SulfurButton>();
@@ -1441,6 +1574,7 @@ namespace Ryuka.Sulfur.NativeUI
             group.childForceExpandHeight = true;
 
             List<SulfurButtonHandle> handles = new List<SulfurButtonHandle>(valid.Count);
+            List<UIButton> rowButtons = new List<UIButton>(valid.Count);
             foreach (SulfurButton spec in valid)
             {
                 UIButton button = CreateSmallButton(row.transform, spec.Label, spec.OnPressed);
@@ -1452,6 +1586,22 @@ namespace Ryuka.Sulfur.NativeUI
 
                 TextMeshProUGUI buttonLabel = button.GetComponentInChildren<TextMeshProUGUI>(true);
                 handles.Add(new SulfurButtonHandle(button.gameObject, button, buttonLabel));
+                rowButtons.Add(button);
+            }
+
+            // One navigation stop for the whole row: left/right picks the button, Use presses it.
+            OptionsScreenOption proxy = RegisterNavigationProxy(rowRt, null);
+            if (proxy != null)
+            {
+                SulfurOptionBinding proxyBinding = proxy.GetComponent<SulfurOptionBinding>();
+                SulfurButtonRowNavigator navigator = proxy.gameObject.AddComponent<SulfurButtonRowNavigator>();
+                navigator.Configure(proxyBinding, rowButtons);
+
+                if (proxyBinding != null)
+                {
+                    proxyBinding.OnUse = navigator.UseFocused;
+                    proxyBinding.OnHorizontal = navigator.Move;
+                }
             }
 
             return handles;
@@ -1463,6 +1613,9 @@ namespace Ryuka.Sulfur.NativeUI
         // ping + kick button) that change while the page is open.
         public SulfurListHandle AddList()
         {
+            if (!EnsureAlive("AddList"))
+                return new SulfurListHandle(this, null);
+
             float width = GetNativeOptionWidth();
 
             GameObject group = new GameObject(
@@ -1505,6 +1658,9 @@ namespace Ryuka.Sulfur.NativeUI
 
         public void AddSpacer(float height = 20f)
         {
+            if (!EnsureAlive("AddSpacer"))
+                return;
+
             GameObject spacer = new GameObject("SULFUR_Spacer", typeof(RectTransform), typeof(LayoutElement));
             spacer.transform.SetParent(OptionsContainer, false);
 
@@ -1514,6 +1670,11 @@ namespace Ryuka.Sulfur.NativeUI
             layout.flexibleHeight = 0f;
         }
 
+        /// <summary>Adds a "label: value" description row.</summary>
+        /// <returns>
+        /// Always null for now (see <see cref="AddDescription"/>). The return type is kept for
+        /// binary compatibility with mods compiled against earlier versions.
+        /// </returns>
         public OptionsScreenOption AddReadonlyText(string label, string value)
         {
             string text = string.IsNullOrWhiteSpace(value) ? (label ?? "") : ((label ?? "") + ": " + value);
@@ -1534,13 +1695,17 @@ namespace Ryuka.Sulfur.NativeUI
             string value,
             Action<string> onChanged)
         {
-            OptionsScreenOption labelOption = AddInfo(label);
+            if (!EnsureAlive("AddTextInput"))
+                return null;
+
+            // The label row is not a navigation stop of its own: focus lands on the input below.
+            OptionsScreenOption labelOption = AddInfoRow(label, false);
             AddDescription(description);
 
             TMP_InputField input = CreateStandaloneInputField(
                 "TextInput_" + label,
                 value ?? "",
-                "Enter text...",
+                SulfurUiText.TextInputPlaceholder,
                 TMP_InputField.ContentType.Standard);
 
             input.onValueChanged.RemoveAllListeners();
@@ -1549,6 +1714,8 @@ namespace Ryuka.Sulfur.NativeUI
                 if (onChanged != null)
                     onChanged(text);
             }));
+
+            RegisterInputNavigation(input, input.GetComponent<RectTransform>());
 
             return labelOption;
         }
@@ -1573,14 +1740,22 @@ namespace Ryuka.Sulfur.NativeUI
     int decimals,
     Action<float> onChanged)
         {
-            OptionsScreenOption labelOption = AddInfo(label);
+            if (!EnsureAlive("AddNumberInput"))
+                return null;
+
+            // The label row is not a navigation stop of its own: focus lands on the input below.
+            OptionsScreenOption labelOption = AddInfoRow(label, false);
             AddDescription(description);
 
             TMP_InputField input = CreateStandaloneInputField(
                 "NumberInput_" + label,
                 FormatNumber(value, decimals),
-                "Enter number...",
+                SulfurUiText.NumberInputPlaceholder,
                 TMP_InputField.ContentType.DecimalNumber);
+
+            // Unparseable input reverts to the last value this field accepted, not to the
+            // value the page was built with.
+            float lastAccepted = value;
 
             input.onEndEdit.RemoveAllListeners();
             input.onEndEdit.AddListener(new UnityAction<string>(delegate (string text)
@@ -1588,18 +1763,21 @@ namespace Ryuka.Sulfur.NativeUI
                 float parsed;
                 if (!TryParseNumber(text, out parsed))
                 {
-                    input.SetTextWithoutNotify(FormatNumber(value, decimals));
+                    input.SetTextWithoutNotify(FormatNumber(lastAccepted, decimals));
                     return;
                 }
 
                 parsed = Mathf.Clamp(parsed, min, max);
                 parsed = RoundNumber(parsed, decimals);
+                lastAccepted = parsed;
 
                 input.SetTextWithoutNotify(FormatNumber(parsed, decimals));
 
                 if (onChanged != null)
                     onChanged(parsed);
             }));
+
+            RegisterInputNavigation(input, input.GetComponent<RectTransform>());
 
             return labelOption;
         }
@@ -1623,11 +1801,14 @@ namespace Ryuka.Sulfur.NativeUI
             float labelWidth = 160f,
             bool password = false)
         {
+            if (!EnsureAlive("AddInlineTextInput"))
+                return null;
+
             TMP_InputField input = BuildInlineInputRow(
                 "SULFUR_InlineText_" + (label ?? ""),
                 label,
                 value ?? "",
-                "Enter text...",
+                SulfurUiText.TextInputPlaceholder,
                 password ? TMP_InputField.ContentType.Password : TMP_InputField.ContentType.Standard,
                 labelWidth);
 
@@ -1637,6 +1818,8 @@ namespace Ryuka.Sulfur.NativeUI
                 if (onChanged != null)
                     onChanged(text);
             }));
+
+            RegisterInputNavigation(input, input.transform.parent as RectTransform);
 
             return input;
         }
@@ -1650,13 +1833,20 @@ namespace Ryuka.Sulfur.NativeUI
             Action<float> onChanged,
             float labelWidth = 160f)
         {
+            if (!EnsureAlive("AddInlineNumberInput"))
+                return null;
+
             TMP_InputField input = BuildInlineInputRow(
                 "SULFUR_InlineNumber_" + (label ?? ""),
                 label,
                 FormatNumber(value, decimals),
-                "Enter number...",
+                SulfurUiText.NumberInputPlaceholder,
                 TMP_InputField.ContentType.DecimalNumber,
                 labelWidth);
+
+            // Unparseable input reverts to the last value this field accepted, not to the
+            // value the page was built with.
+            float lastAccepted = value;
 
             input.onEndEdit.RemoveAllListeners();
             input.onEndEdit.AddListener(new UnityAction<string>(delegate (string text)
@@ -1664,12 +1854,13 @@ namespace Ryuka.Sulfur.NativeUI
                 float parsed;
                 if (!TryParseNumber(text, out parsed))
                 {
-                    input.SetTextWithoutNotify(FormatNumber(value, decimals));
+                    input.SetTextWithoutNotify(FormatNumber(lastAccepted, decimals));
                     return;
                 }
 
                 parsed = Mathf.Clamp(parsed, min, max);
                 parsed = RoundNumber(parsed, decimals);
+                lastAccepted = parsed;
 
                 input.SetTextWithoutNotify(FormatNumber(parsed, decimals));
 
@@ -1677,153 +1868,9 @@ namespace Ryuka.Sulfur.NativeUI
                     onChanged(parsed);
             }));
 
-            return input;
-        }
-
-        private OptionsScreenOption AddTextInputInternal(
-            string label,
-            string value,
-            string placeholder,
-            TMP_InputField.ContentType contentType,
-            Action<string> onChanged,
-            Action<string> onEndEdit)
-        {
-            return AddTextInputInternal(label, value, placeholder, contentType, onChanged, onEndEdit, null);
-        }
-
-        private OptionsScreenOption AddTextInputInternal(
-            string label,
-            string value,
-            string placeholder,
-            TMP_InputField.ContentType contentType,
-            Action<string> onChanged,
-            Action<string> onEndEdit,
-            Action<TMP_InputField> afterCreate)
-        {
-            GameObject prefab = SulfurOptionsScreenBridge.GetOptionButtonPrefab(optionsScreen);
-            OptionsScreenOption option = InstantiateOption(prefab);
-            option.SetLabel(label ?? "");
-
-            TMP_InputField input = CreateInputFieldOnOption(option, value ?? "", placeholder ?? "", contentType);
-
-            SulfurTextInputBinding inputBinding = input.gameObject.AddComponent<SulfurTextInputBinding>();
-            inputBinding.Configure(input);
-
-            input.onValueChanged.RemoveAllListeners();
-            input.onValueChanged.AddListener(new UnityAction<string>(delegate (string text)
-            {
-                if (onChanged != null)
-                    onChanged(text);
-            }));
-
-            input.onEndEdit.RemoveAllListeners();
-            input.onEndEdit.AddListener(new UnityAction<string>(delegate (string text)
-            {
-                if (onEndEdit != null)
-                    onEndEdit(text);
-            }));
-
-            option.onButtonPressed = delegate
-            {
-                if (EventSystem.current != null)
-                    EventSystem.current.SetSelectedGameObject(input.gameObject);
-
-                input.ActivateInputField();
-            };
-
-            if (afterCreate != null)
-                afterCreate(input);
-
-            RegisterOption(option);
-            return option;
-        }
-
-        private TMP_InputField CreateInputFieldOnOption(
-            OptionsScreenOption option,
-            string value,
-            string placeholder,
-            TMP_InputField.ContentType contentType)
-        {
-            RectTransform optionRt = option.GetComponent<RectTransform>();
-            UIText labelText = SulfurOptionsScreenBridge.GetOptionLabelText(option);
-
-            GameObject root = new GameObject("SULFUR_TMP_InputField", typeof(RectTransform), typeof(CanvasRenderer), typeof(UIImage), typeof(TMP_InputField));
-            root.transform.SetParent(option.transform, false);
-
-            RectTransform rootRt = root.GetComponent<RectTransform>();
-            rootRt.anchorMin = new Vector2(0.52f, 0.18f);
-            rootRt.anchorMax = new Vector2(0.98f, 0.82f);
-            rootRt.pivot = new Vector2(0.5f, 0.5f);
-            rootRt.offsetMin = Vector2.zero;
-            rootRt.offsetMax = Vector2.zero;
-
-            UIImage image = root.GetComponent<UIImage>();
-            image.color = new Color(1f, 1f, 1f, 0.08f);
-            image.raycastTarget = true;
-
-            GameObject viewport = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
-            viewport.transform.SetParent(root.transform, false);
-            RectTransform viewportRt = viewport.GetComponent<RectTransform>();
-            viewportRt.anchorMin = Vector2.zero;
-            viewportRt.anchorMax = Vector2.one;
-            viewportRt.offsetMin = new Vector2(8f, 2f);
-            viewportRt.offsetMax = new Vector2(-8f, -2f);
-
-            UIText placeholderText = CreateInputText(viewport.transform, "Placeholder", placeholder, labelText);
-            placeholderText.color = new Color(1f, 1f, 1f, 0.35f);
-            placeholderText.fontStyle = FontStyles.Italic;
-
-            UIText valueText = CreateInputText(viewport.transform, "Text", value, labelText);
-            valueText.color = labelText != null ? labelText.color : Color.white;
-
-            TMP_InputField input = root.GetComponent<TMP_InputField>();
-            input.textViewport = viewportRt;
-            input.textComponent = valueText;
-            input.placeholder = placeholderText;
-            input.targetGraphic = image;
-            input.contentType = contentType;
-            input.lineType = TMP_InputField.LineType.SingleLine;
-            input.shouldActivateOnSelect = true;
-            input.onFocusSelectAll = false;
-            input.resetOnDeActivation = false;
-            input.restoreOriginalTextOnEscape = false;
-            input.SetTextWithoutNotify(value ?? "");
+            RegisterInputNavigation(input, input.transform.parent as RectTransform);
 
             return input;
-        }
-
-        private UIText CreateInputText(Transform parent, string name, string text, UIText template)
-        {
-            GameObject go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(UIText));
-            go.transform.SetParent(parent, false);
-
-            RectTransform rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
-
-            UIText tmp = go.GetComponent<UIText>();
-            tmp.text = text ?? "";
-            tmp.raycastTarget = false;
-            tmp.alignment = TextAlignmentOptions.MidlineLeft;
-            tmp.textWrappingMode = TextWrappingModes.NoWrap;
-            tmp.overflowMode = TextOverflowModes.Overflow;
-
-            if (template != null)
-            {
-                tmp.font = template.font;
-                tmp.fontSharedMaterial = template.fontSharedMaterial;
-                tmp.fontSize = template.fontSize;
-                tmp.color = template.color;
-            }
-            else
-            {
-                tmp.fontSize = 20f;
-                tmp.color = Color.white;
-            }
-
-            return tmp;
         }
 
         internal IEnumerable<Transform> GetChildrenFrom(int startIndex)
@@ -1861,12 +1908,155 @@ namespace Ryuka.Sulfur.NativeUI
             return option;
         }
 
+        // The game's button prefab carries the slider value text (placeholder "100%") on a
+        // zero-width rect; the game only ever writes it for slider rows. Left alone on a
+        // button clone it wraps one character per line into a vertical "1 0 0 %" column,
+        // so clear it. Clearing (not deactivating) keeps the row's layout unchanged.
+        private OptionsScreenOption InstantiateButtonOption()
+        {
+            OptionsScreenOption option = InstantiateOption(SulfurOptionsScreenBridge.GetOptionButtonPrefab(optionsScreen));
+
+            TextMeshProUGUI valueText = SulfurOptionsScreenBridge.GetSliderValueText(option);
+            if (valueText != null)
+                valueText.text = "";
+
+            return option;
+        }
+
+        // nativeOptions is the game's OptionsScreen.options for this page: the list its
+        // keyboard/gamepad navigation walks by index. Rows are inserted at their visual
+        // position in the page, not appended, so navigation order matches screen order
+        // even when a list section (SulfurListHandle) is refreshed after rows below it
+        // were built. A plain top-to-bottom page build still appends (fast path).
         private void RegisterOption(OptionsScreenOption option)
         {
             if (option == null)
                 return;
 
-            nativeOptions.Add(option);
+            nativeOptions.Insert(FindNavigationInsertIndex(option.transform), option);
+        }
+
+        // Makes a library widget that is not a native option row reachable by keyboard and
+        // gamepad: a navigation proxy (see SulfurNavigationProxy) inside host, registered at
+        // host's place in the page. Call after host's contents are built. Returns the proxy,
+        // or null when it could not be created (the widget then stays mouse-only).
+        internal OptionsScreenOption RegisterNavigationProxy(RectTransform host, Action onUse)
+        {
+            OptionsScreenOption proxy = SulfurNavigationProxy.Create(optionsScreen, host, onUse);
+            if (proxy != null)
+                RegisterOption(proxy);
+
+            return proxy;
+        }
+
+        // Use on the row starts typing in input. Leaving the field (Enter, Escape, a click
+        // elsewhere) returns to row navigation with this row still selected: the selection
+        // never moved, only the EventSystem focus did.
+        private void RegisterInputNavigation(TMP_InputField input, RectTransform host)
+        {
+            if (input == null || host == null)
+                return;
+
+            SulfurTextInputBinding inputBinding = input.GetComponent<SulfurTextInputBinding>();
+
+            RegisterNavigationProxy(host, delegate
+            {
+                if (input == null || !input.IsActive() || !input.IsInteractable() || input.isFocused)
+                    return;
+
+                // The Submit that just ended editing must not start it again.
+                if (inputBinding != null && inputBinding.LeftFocusRecently)
+                    return;
+
+                input.ActivateInputField();
+            });
+        }
+
+        // Removes every registered row under container (a list section about to be
+        // cleared, including rows of lists nested in it) from the navigation list, plus
+        // entries whose row is already destroyed. The game indexes this list directly,
+        // so a destroyed entry left behind throws during navigation.
+        internal void UnregisterOptionsUnder(Transform container)
+        {
+            if (container == null)
+                return;
+
+            nativeOptions.RemoveAll(delegate (OptionsScreenOption option)
+            {
+                return option == null || option.transform.IsChildOf(container);
+            });
+        }
+
+        // Selection bookkeeping around a list refresh; see
+        // SulfurOptionsScreenBridge.ReconcileOptionSelection.
+        internal int CaptureSelectedOptionIndex()
+        {
+            return SulfurOptionsScreenBridge.GetSelectedOptionIndex(optionsScreen, nativeOptions);
+        }
+
+        internal void ReconcileSelectedOption(int previousSelectedIndex)
+        {
+            SulfurOptionsScreenBridge.ReconcileOptionSelection(optionsScreen, nativeOptions, previousSelectedIndex);
+        }
+
+        private readonly List<int> insertPathBuffer = new List<int>();
+        private readonly List<int> comparePathBuffer = new List<int>();
+
+        private int FindNavigationInsertIndex(Transform row)
+        {
+            int count = nativeOptions.Count;
+            if (count == 0 || row == null || !TryGetSiblingPath(row, insertPathBuffer))
+                return count;
+
+            // Walk back from the end: the first registered row that sits above the new
+            // one marks the insert position. Normally the very last entry does.
+            for (int i = count - 1; i >= 0; i--)
+            {
+                OptionsScreenOption existing = nativeOptions[i];
+                if (existing == null || !TryGetSiblingPath(existing.transform, comparePathBuffer))
+                    continue;
+
+                if (CompareSiblingPaths(comparePathBuffer, insertPathBuffer) <= 0)
+                    return i + 1;
+            }
+
+            return 0;
+        }
+
+        // Sibling indices from the page root down to t. False when t is not under the
+        // page root (then the caller falls back to appending).
+        private bool TryGetSiblingPath(Transform t, List<int> path)
+        {
+            path.Clear();
+
+            if (rootOptionsContainer == null)
+                return false;
+
+            Transform current = t;
+            while (current != null && current != rootOptionsContainer)
+            {
+                path.Add(current.GetSiblingIndex());
+                current = current.parent;
+            }
+
+            if (current == null)
+                return false;
+
+            path.Reverse();
+            return true;
+        }
+
+        // Hierarchy (= visual, for these vertical layouts) order; an ancestor sorts first.
+        private static int CompareSiblingPaths(List<int> a, List<int> b)
+        {
+            int n = Mathf.Min(a.Count, b.Count);
+            for (int i = 0; i < n; i++)
+            {
+                if (a[i] != b[i])
+                    return a[i] < b[i] ? -1 : 1;
+            }
+
+            return a.Count.CompareTo(b.Count);
         }
 
         private static void BindCycleButtons(OptionsScreenOption option, SulfurOptionBinding binding)
@@ -2087,41 +2277,13 @@ namespace Ryuka.Sulfur.NativeUI
 
         private static string GetMessagePrefix(SulfurMessageKind kind)
         {
-            switch (kind)
-            {
-                case SulfurMessageKind.Warning:
-                    return "WARNING: ";
-                case SulfurMessageKind.Error:
-                    return "ERROR: ";
-                case SulfurMessageKind.Success:
-                    return "OK: ";
-                default:
-                    return "";
-            }
+            return SulfurUiText.GetMessagePrefix(kind);
         }
 
-        private static void SetFirstText(GameObject root, string text)
-        {
-            if (root == null)
-                return;
-
-            UIText first = root.GetComponentInChildren<UIText>(true);
-            if (first != null)
-                first.text = text ?? "";
-        }
-
-        private static void SetSliderText(UIText text, float value)
+        internal static void SetSliderText(UIText text, float value)
         {
             if (text != null)
                 text.text = value.ToString("0.###", CultureInfo.InvariantCulture);
-        }
-
-        private static bool TryParseFloat(string text, out float value)
-        {
-            if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
-                return true;
-
-            return float.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value);
         }
 
         private static string FormatNumber(float value, int decimals)

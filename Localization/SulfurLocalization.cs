@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
@@ -13,19 +12,26 @@ namespace Ryuka.Sulfur.NativeUI
         private static readonly Dictionary<string, Dictionary<string, Dictionary<string, string>>> data
             = new Dictionary<string, Dictionary<string, Dictionary<string, string>>>(StringComparer.OrdinalIgnoreCase);
 
-        private static string cachedRawLanguage;
+        // Owned by SulfurLanguage: updated from OnLanguageChanged, never polled.
         private static string cachedLanguageCode = "en";
-        private static DateTime lastLanguageCheckUtc = DateTime.MinValue;
 
+        // Lookup order for Get: exact code -> language without region -> en.
+        // Rebuilt on language change so Get does not allocate.
+        private static string[] languageFallbacks = BuildLanguageFallbacks("en");
+
+        /// <summary>
+        /// Incremented every time <see cref="SulfurLanguage.Changed"/> is raised (first
+        /// detection included). Compare against a stored value to know when to re-resolve text.
+        /// </summary>
         public static int LanguageVersion { get; private set; }
 
+        /// <summary>
+        /// The current language code used for lookups (<see cref="SulfurLanguage.Code"/>,
+        /// normalized). <c>"en"</c> until the game's language is known.
+        /// </summary>
         public static string CurrentLanguageCode
         {
-            get
-            {
-                RefreshCurrentLanguage(false);
-                return cachedLanguageCode;
-            }
+            get { return cachedLanguageCode; }
         }
 
         public static void LoadPluginLocalization(string pluginGuid, string pluginAssemblyLocation)
@@ -66,11 +72,13 @@ namespace Ryuka.Sulfur.NativeUI
             if (!data.TryGetValue(pluginGuid, out pluginMap))
                 return fallback ?? "";
 
-            foreach (string langCode in GetLanguageFallbacks())
+            string[] fallbacks = languageFallbacks;
+
+            for (int i = 0; i < fallbacks.Length; i++)
             {
                 Dictionary<string, string> langMap;
 
-                if (!pluginMap.TryGetValue(langCode, out langMap))
+                if (!pluginMap.TryGetValue(fallbacks[i], out langMap))
                     continue;
 
                 string value;
@@ -82,30 +90,28 @@ namespace Ryuka.Sulfur.NativeUI
             return fallback ?? "";
         }
 
+        /// <summary>
+        /// Kept for source compatibility. The language is no longer polled: it is tracked by
+        /// <see cref="SulfurLanguage"/>, which updates <see cref="CurrentLanguageCode"/> and
+        /// <see cref="LanguageVersion"/> when the game's language becomes known or changes.
+        /// This only lets a caller that runs before the library's first frame pick up an
+        /// already-known startup language; it is cheap and <paramref name="force"/> is ignored.
+        /// </summary>
         public static void RefreshCurrentLanguage(bool force)
         {
-            DateTime now = DateTime.UtcNow;
+            SulfurLanguage.ConvergeInitial();
+        }
 
-            if (!force && (now - lastLanguageCheckUtc).TotalSeconds < 0.5)
-                return;
-
-            lastLanguageCheckUtc = now;
-
-            string raw = GetCurrentGameLanguageName();
-            string directCode = GetCurrentGameLanguageCode();
-            string code = NormalizeLanguageCode(directCode);
+        /// <summary>Called by SulfurLanguage before it raises Changed.</summary>
+        internal static void OnLanguageChanged(string languageCode)
+        {
+            string code = NormalizeLanguageCode(languageCode);
 
             if (string.IsNullOrWhiteSpace(code))
-                code = MapGameLanguageToCode(raw);
+                code = "en";
 
-            if (string.Equals(raw, cachedRawLanguage, StringComparison.Ordinal) &&
-                string.Equals(code, cachedLanguageCode, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            cachedRawLanguage = raw;
             cachedLanguageCode = code;
+            languageFallbacks = BuildLanguageFallbacks(code);
             LanguageVersion++;
         }
 
@@ -351,71 +357,24 @@ namespace Ryuka.Sulfur.NativeUI
             return result;
         }
 
-        private static IEnumerable<string> GetLanguageFallbacks()
+        private static string[] BuildLanguageFallbacks(string current)
         {
-            string current = CurrentLanguageCode;
+            List<string> result = new List<string>(3);
 
             if (!string.IsNullOrWhiteSpace(current))
             {
-                yield return current;
+                result.Add(current);
 
                 int dash = current.IndexOf('-');
 
                 if (dash > 0)
-                    yield return current.Substring(0, dash);
+                    result.Add(current.Substring(0, dash));
             }
 
-            yield return "en";
-        }
+            if (!result.Contains("en"))
+                result.Add("en");
 
-        private static string GetCurrentGameLanguageName()
-        {
-            try
-            {
-                Type localizationManagerType = FindTypeByFullName("I2.Loc.LocalizationManager");
-
-                if (localizationManagerType == null)
-                    return "";
-
-                PropertyInfo prop = localizationManagerType.GetProperty(
-                    "CurrentLanguage",
-                    BindingFlags.Public | BindingFlags.Static);
-
-                if (prop == null)
-                    return "";
-
-                object value = prop.GetValue(null, null);
-                return value != null ? value.ToString() : "";
-            }
-            catch
-            {
-                return "";
-            }
-        }
-
-        private static string GetCurrentGameLanguageCode()
-        {
-            try
-            {
-                Type localizationManagerType = FindTypeByFullName("I2.Loc.LocalizationManager");
-
-                if (localizationManagerType == null)
-                    return "";
-
-                PropertyInfo prop = localizationManagerType.GetProperty(
-                    "CurrentLanguageCode",
-                    BindingFlags.Public | BindingFlags.Static);
-
-                if (prop == null)
-                    return "";
-
-                object value = prop.GetValue(null, null);
-                return value != null ? value.ToString() : "";
-            }
-            catch
-            {
-                return "";
-            }
+            return result.ToArray();
         }
 
         private static string NormalizeLanguageCode(string code)
@@ -438,92 +397,6 @@ namespace Ryuka.Sulfur.NativeUI
                 return "es-ES";
 
             return value.ToLowerInvariant();
-        }
-
-        private static string MapGameLanguageToCode(string gameLanguage)
-        {
-            if (string.IsNullOrWhiteSpace(gameLanguage))
-                return "en";
-
-            string value = gameLanguage.Trim();
-
-            if (value.Equals("Chinese (Simplified)", StringComparison.OrdinalIgnoreCase))
-                return "zh-CN";
-
-            if (value.Equals("Chinese (Traditional)", StringComparison.OrdinalIgnoreCase))
-                return "zh-TW";
-
-            if (value.Equals("English", StringComparison.OrdinalIgnoreCase))
-                return "en";
-
-            if (value.Equals("Swedish", StringComparison.OrdinalIgnoreCase))
-                return "sv";
-
-            if (value.Equals("French", StringComparison.OrdinalIgnoreCase))
-                return "fr";
-
-            if (value.Equals("Italian", StringComparison.OrdinalIgnoreCase))
-                return "it";
-
-            if (value.Equals("German", StringComparison.OrdinalIgnoreCase))
-                return "de";
-
-            if (value.Equals("Spanish", StringComparison.OrdinalIgnoreCase))
-                return "es";
-
-            if (value.Equals("Portuguese", StringComparison.OrdinalIgnoreCase))
-                return "pt";
-
-            if (value.Equals("Russian", StringComparison.OrdinalIgnoreCase))
-                return "ru";
-
-            if (value.Equals("Polish", StringComparison.OrdinalIgnoreCase))
-                return "pl";
-
-            if (value.Equals("Japanese", StringComparison.OrdinalIgnoreCase))
-                return "ja";
-
-            if (value.Equals("Korean", StringComparison.OrdinalIgnoreCase))
-                return "ko";
-
-            if (value.Equals("Turkish", StringComparison.OrdinalIgnoreCase))
-                return "tr";
-
-            if (value.Equals("Arabic", StringComparison.OrdinalIgnoreCase))
-                return "ar";
-
-            if (value.Contains("简体") || value.Contains("简体中文") || value.Contains("简中"))
-                return "zh-CN";
-
-            if (value.Contains("繁體") || value.Contains("繁体") || value.Contains("繁中"))
-                return "zh-TW";
-
-            if (value.IndexOf("Chinese", StringComparison.OrdinalIgnoreCase) >= 0)
-                return "zh-CN";
-
-            if (value.IndexOf("Japanese", StringComparison.OrdinalIgnoreCase) >= 0)
-                return "ja";
-
-            return "en";
-        }
-
-        private static Type FindTypeByFullName(string fullName)
-        {
-            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                try
-                {
-                    Type type = assembly.GetType(fullName);
-
-                    if (type != null)
-                        return type;
-                }
-                catch
-                {
-                }
-            }
-
-            return null;
         }
 
         [DataContract]

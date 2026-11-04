@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "key": "ui.message.warning_prefix",
+      "value": "ВНИМАНИЕ: "
+    },
+    {
+      "key": "ui.message.error_prefix",
+      "value": "ОШИБКА: "
+    },
+    {
+      "key": "ui.message.success_prefix",
+      "value": "OK: "
+    },
+    {
+      "key": "ui.input.placeholder",
+      "value": "Введите текст..."
+    },
+    {
+      "key": "ui.page.no_options",
+      "value": "Нет параметров."
+    },
+    {
+      "key": "ui.badge.dirty",
+      "value": "Ожидает"
+    },
+    {
+      "key": "ui.badge.clean",
+      "value": "Без изменений"
+    },
+    {
+      "key": "ui.button.default",
+      "value": "По умолчанию"
+    },
+    {
+      "key": "ui.footer.apply",
+      "value": "Применить"
+    },
+    {
+      "key": "ui.foldout.mod_tag",
+      "value": "МОД"
+    },
+    {
+      "key": "ui.input.number_placeholder",
+      "value": "Введите число..."
+    },
+    {
+      "key": "ui.page.load_failed",
+      "value": "Не удалось загрузить эту страницу. См. журнал BepInEx."
+    },
+    {
+      "key": "ui.badge.restart_required",
+      "value": "Нужен перезапуск"
+    },
+    {
+      "key": "ui.badge.live_apply",
+      "value": "Применяется сразу"
+    },
+    {
+      "key": "ui.badge.advanced",
+      "value": "Дополнительно"
+    },
+    {
+      "key": "ui.badge.hidden",
+      "value": "Скрыто"
+    },
+    {
+      "key": "ui.badge.dangerous",
+      "value": "Опасно"
+    }
+  ]
+}

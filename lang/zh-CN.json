@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "key": "ui.message.warning_prefix",
+      "value": "警告："
+    },
+    {
+      "key": "ui.message.error_prefix",
+      "value": "错误："
+    },
+    {
+      "key": "ui.message.success_prefix",
+      "value": "成功："
+    },
+    {
+      "key": "ui.input.placeholder",
+      "value": "输入文本..."
+    },
+    {
+      "key": "ui.page.no_options",
+      "value": "没有选项。"
+    },
+    {
+      "key": "ui.badge.dirty",
+      "value": "待应用"
+    },
+    {
+      "key": "ui.badge.clean",
+      "value": "未修改"
+    },
+    {
+      "key": "ui.button.default",
+      "value": "默认"
+    },
+    {
+      "key": "ui.footer.apply",
+      "value": "应用"
+    },
+    {
+      "key": "ui.foldout.mod_tag",
+      "value": "模组"
+    },
+    {
+      "key": "ui.input.number_placeholder",
+      "value": "输入数字..."
+    },
+    {
+      "key": "ui.page.load_failed",
+      "value": "此页面加载失败。请查看 BepInEx 日志。"
+    },
+    {
+      "key": "ui.badge.restart_required",
+      "value": "需要重启"
+    },
+    {
+      "key": "ui.badge.live_apply",
+      "value": "实时生效"
+    },
+    {
+      "key": "ui.badge.advanced",
+      "value": "高级"
+    },
+    {
+      "key": "ui.badge.hidden",
+      "value": "隐藏"
+    },
+    {
+      "key": "ui.badge.dangerous",
+      "value": "危险"
+    }
+  ]
+}

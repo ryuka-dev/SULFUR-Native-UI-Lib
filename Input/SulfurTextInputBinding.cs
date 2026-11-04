@@ -1,7 +1,6 @@
 ﻿using System;
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 namespace Ryuka.Sulfur.NativeUI
 {
@@ -21,22 +20,29 @@ namespace Ryuka.Sulfur.NativeUI
             }
         }
 
-        public static bool CancelActiveInput()
+        // Frame on which the field last stopped being focused (Enter, Escape, a click
+        // elsewhere); -1 before that.
+        private int lastFocusLostFrame = -1;
+        private bool wasFocused;
+
+        /// <summary>
+        /// True on the frame the field stopped being focused and the next one. A keyboard Use
+        /// in that window is the key press that ended editing (the game's Submit callback and
+        /// TMP's own key handling run at different points of the frame), not a new request.
+        /// </summary>
+        public bool LeftFocusRecently
         {
-            if (activeBinding == null || activeBinding.InputField == null)
-                return false;
+            get { return lastFocusLostFrame >= 0 && Time.frameCount - lastFocusLostFrame <= 1; }
+        }
 
-            TMP_InputField input = activeBinding.InputField;
+        private void LateUpdate()
+        {
+            bool focused = InputField != null && InputField.isFocused;
 
-            if (!input.isFocused && EventSystem.current != null && EventSystem.current.currentSelectedGameObject != input.gameObject)
-                return false;
+            if (wasFocused && !focused)
+                lastFocusLostFrame = Time.frameCount;
 
-            input.DeactivateInputField(false);
-
-            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject == input.gameObject)
-                EventSystem.current.SetSelectedGameObject(null);
-
-            return true;
+            wasFocused = focused;
         }
 
         public void Configure(TMP_InputField input)

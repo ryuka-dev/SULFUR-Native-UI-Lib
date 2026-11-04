@@ -15,6 +15,17 @@ namespace Ryuka.Sulfur.NativeUI
         private float blinkTimer;
         private bool blinkVisible = true;
 
+        // Inputs of the last caret layout. The position is only recomputed when one of
+        // them changes; GetPreferredValues is a full TMP layout pass, too costly to run
+        // every frame while the field is focused.
+        private bool layoutValid;
+        private string lastText;
+        private int lastCaretPosition;
+        private float lastFontSize;
+        private TMP_FontAsset lastFont;
+        private float lastViewportWidth;
+        private float lastViewportHeight;
+
         public static SulfurInputCaretOverlay Attach(
             TMP_InputField input,
             TextMeshProUGUI textComponent,
@@ -72,6 +83,7 @@ namespace Ryuka.Sulfur.NativeUI
                 caretImage.enabled = false;
                 blinkTimer = 0f;
                 blinkVisible = true;
+                layoutValid = false;
                 return;
             }
 
@@ -83,12 +95,12 @@ namespace Ryuka.Sulfur.NativeUI
                 blinkVisible = !blinkVisible;
             }
 
-            UpdateCaretPosition();
+            UpdateCaretPositionIfChanged();
 
             caretImage.enabled = blinkVisible;
         }
 
-        private void UpdateCaretPosition()
+        private void UpdateCaretPositionIfChanged()
         {
             string text = input.text ?? "";
 
@@ -103,6 +115,34 @@ namespace Ryuka.Sulfur.NativeUI
                 caretIndex = text.Length;
             }
 
+            float fontSize = textComponent.fontSize;
+            TMP_FontAsset font = textComponent.font;
+            Rect viewportRect = viewport.rect;
+
+            if (layoutValid
+                && caretIndex == lastCaretPosition
+                && fontSize == lastFontSize
+                && font == lastFont
+                && viewportRect.width == lastViewportWidth
+                && viewportRect.height == lastViewportHeight
+                && string.Equals(text, lastText, System.StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            layoutValid = true;
+            lastText = text;
+            lastCaretPosition = caretIndex;
+            lastFontSize = fontSize;
+            lastFont = font;
+            lastViewportWidth = viewportRect.width;
+            lastViewportHeight = viewportRect.height;
+
+            UpdateCaretPosition(text, caretIndex);
+        }
+
+        private void UpdateCaretPosition(string text, int caretIndex)
+        {
             string prefix = caretIndex > 0 ? text.Substring(0, caretIndex) : "";
 
             float x = 0f;

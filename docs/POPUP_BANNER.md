@@ -42,11 +42,12 @@ visual; the caller keeps ownership of any keypress/confirm logic.
 - **Cheap when hidden** — hiding deactivates the visual root; no per-frame cost.
 - **Lazy** — the overlay is created on the first `ShowBanner`; `HideBanner` never
   creates it.
-- **Language-correct font** — the label samples a live, localized game
-  `TextMeshProUGUI` so non-Latin languages (CJK, Cyrillic, …) render correctly
-  instead of as blank boxes. If no live text is available yet, it falls back to the
-  TMP default font *without locking in*, so a later `ShowBanner` upgrades to the
-  real localized font.
+- **Language-correct font** — the label is bound to the game's `SerifBold` role
+  font (the role of the game's own centred HUD alerts) at a fixed 34pt, through
+  `SulfurFonts`. It follows a language change while shown, and the CJK/symbol
+  fallback sits on the font itself, so non-Latin text renders in every language.
+  If the game's fonts are not loaded yet it shows TMP's default font and upgrades
+  as soon as the game loads them.
 
 ## Consumer wiring (SULFUR Together, LD-2c)
 

@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "key": "ui.message.warning_prefix",
+      "value": "VARNING: "
+    },
+    {
+      "key": "ui.message.error_prefix",
+      "value": "FEL: "
+    },
+    {
+      "key": "ui.message.success_prefix",
+      "value": "OK: "
+    },
+    {
+      "key": "ui.input.placeholder",
+      "value": "Ange text..."
+    },
+    {
+      "key": "ui.page.no_options",
+      "value": "Inga alternativ."
+    },
+    {
+      "key": "ui.badge.dirty",
+      "value": "Väntar"
+    },
+    {
+      "key": "ui.badge.clean",
+      "value": "Oförändrad"
+    },
+    {
+      "key": "ui.button.default",
+      "value": "Standard"
+    },
+    {
+      "key": "ui.footer.apply",
+      "value": "Verkställ"
+    },
+    {
+      "key": "ui.foldout.mod_tag",
+      "value": "MOD"
+    },
+    {
+      "key": "ui.input.number_placeholder",
+      "value": "Ange tal..."
+    },
+    {
+      "key": "ui.page.load_failed",
+      "value": "Sidan kunde inte läsas in. Se BepInEx-loggen."
+    },
+    {
+      "key": "ui.badge.restart_required",
+      "value": "Omstart krävs"
+    },
+    {
+      "key": "ui.badge.live_apply",
+      "value": "Gäller direkt"
+    },
+    {
+      "key": "ui.badge.advanced",
+      "value": "Avancerat"
+    },
+    {
+      "key": "ui.badge.hidden",
+      "value": "Dold"
+    },
+    {
+      "key": "ui.badge.dangerous",
+      "value": "Farlig"
+    }
+  ]
+}

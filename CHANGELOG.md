@@ -1,5 +1,132 @@
 # Changelog
 
+## 0.11.0
+
+### Fixed
+
+- **Chinese (and other non-Latin) text no longer disappears from toasts and the
+  banner.** Both surfaces took their font from whichever game text
+  `FindObjectsByType` happened to return first. Since game 1.0.4 that is often a
+  Latin-only HUD font (`Fredoka-Regular SDF`), so in Chinese every CJK character
+  was dropped (e.g. `按 [Return] 进入竞技场` showed only `[Return]`) and the font
+  could differ from one session to the next. They now use the game's own role fonts
+  (below), with the glyph fallback attached to the font itself.
+- **Glyph fallback no longer depends on TMP's global fallback list.** The game
+  clears that list whenever it switches the input-icon font, so a fallback that
+  lived only there could vanish at any time. Every font the library hands out now
+  carries the fallback in its own fallback table.
+- **No more vertical "1 0 0 %" beside buttons.** `AddButton` rows (and inline text
+  inputs, which reuse the same game prefab) showed the prefab's slider-value
+  placeholder `100%` wrapped one character per line, because that text sits on a
+  zero-width rect and the game only fills it for slider rows. The library now
+  clears it on every button-prefab clone.
+- **Keyboard/gamepad navigation on custom pages.**
+  - Rows refreshed through `SulfurListHandle` stayed in the game's navigation list
+    after being destroyed (MissingReferenceException on the next Up/Down) and were
+    re-added at the end of the list. Navigation order now always equals screen
+    order, and the selection moves off removed rows.
+  - Hidden rows (collapsed foldouts, `SetActive(false)`, hidden lists) are skipped.
+    Before, they could be selected while invisible, and the game's `SelectIndex`
+    could run out of range or loop forever.
+  - Up/Down in the category menu goes through the game's own code again, so the
+    rebind screen's list navigation is no longer hijacked into switching category.
+- **Typing Space or Enter in a library text input no longer triggers the options
+  screen's Submit** (which rebuilt the page and destroyed the input, or pressed the
+  selected row).
+- **Toggles and sliders keep saving after being hidden.** The game's
+  `OptionsScreenOption.OnDisable` removes every listener from them; the library now
+  re-attaches its own when the row is shown again.
+- **A page whose `BuildPage` throws** shows an error row instead of a blank page
+  that then threw on Use/Escape; the exception is logged once with the page id. A
+  category button whose page was unregistered behaves the same. One mod's failing
+  page name no longer removes the buttons of the pages after it.
+- **Number inputs** revert invalid input to the last accepted value, not to the
+  value the page was built with.
+- **Pause menu**: the library no longer clears the game's initial selection (the
+  Resume button) every time the pause menu opens; it only clears a selection that
+  is a library input or inside the options screen.
+- **Glyph fallback** no longer retries every OS font on every row when none can be
+  loaded (e.g. under Proton): at most 5 attempts, 30 s apart, one warning.
+- **Workaround for a game bug: no more NullReferenceException spam when moving the
+  mouse over Options rows at the main menu** (the game's
+  `OptionsScreenOption.OnPointerEnter/Exit` read `GameManager.Instance`, which does
+  not exist there; affects the game's own rows too). Hover highlighting now works
+  there as well. Implemented as Harmony finalizers that act only when the game's
+  method actually throws that exception, so a game version that fixes the bug runs
+  its own code untouched (`Integration/SulfurMainMenuHoverGuard.cs`; delete it once
+  the fix has shipped).
+
+### Added
+
+- **`SulfurFonts` — fonts by role, following the language.**
+  `SulfurFonts.Get(SulfurFontRole)` returns the game's current font for one of its
+  six roles (`RoundRegular`…`SerifBold`), the same fonts the game's UI uses.
+  `SulfurFonts.Bind(text, role)` also keeps a text on its role, so it switches font
+  when the player changes language. `SulfurFonts.WithFallback(font)` gives a mod's
+  own font the same CJK/symbol coverage; `SulfurFonts.FontsChanged` reports a
+  change. Hooks the game's `FontLocalizer.LoadFontCache`; on a game build without
+  that mechanism, every call returns TMP's default font (with fallback) and one
+  warning is logged.
+- **`SulfurLanguage`: follow the game's language with one call.**
+  `SulfurLanguage.Follow(code => ...)` calls back once the language is known
+  (including when the player simply starts the game in, say, Chinese; the game
+  raises no event for that) and after every change, *after* all of the game's own
+  language-change handlers have run, so text a mod sets is not overwritten. Also
+  `Code`, `IsReady`, `IsRightToLeft`, `Changed`, `FixRtl(text)`. Replaces
+  subscribing to `AsyncAssetLoading.onLanguageChange` yourself.
+- **Row handles for native rows:** `AddToggleRow`, `AddSliderRow` and `AddCycleRow`
+  return `SulfurToggleHandle` / `SulfurSliderHandle` / `SulfurCycleHandle` with
+  `SetValueWithoutNotify`, `SetLocked` (dims the row and blocks pointer and
+  keyboard input without touching label colours; the game's own `SetLocked` makes
+  labels of library-built rows invisible), `SetVisible`, `SetLabel` and `IsAlive`.
+  `AddSliderRow` also snaps mouse drags to `step`. The existing `AddToggle` /
+  `AddSlider` / `AddCycle` are unchanged.
+- **Keyboard and gamepad reach every library widget**: foldout headers, small
+  buttons, button rows (Left/Right moves a focus frame between the buttons), Default
+  buttons, text and number inputs (Enter starts typing, Escape stops), and the
+  footer button. They get the game's own selection border; mouse behaviour is
+  unchanged.
+- **`SulfurOptionsContext.IsAlive`.** A context stops being alive when its page is
+  rebuilt, another page is shown or the screen closes; calls on a dead context are
+  ignored instead of writing into whatever page is on screen now.
+- **The library's own text is localized** in all 14 game languages (`lang/*.json`
+  beside the DLL): message prefixes, input placeholders, Default/Apply/MOD,
+  built-in setting-row badges, and the page-failed message. Machine translations,
+  to be reviewed by native speakers.
+
+### Changed
+
+- Fonts are now fixed per surface, matching the game's own usage: option rows and
+  the options footer `SerifRegular`; banner `SerifBold` at a fixed 34pt (it was the
+  sampled text's size × 1.1, clamped to 28–48); toast title `SerifBold`, toast body
+  `SerifSemibold`. Toast texts no longer add faux bold — the weight comes from the
+  role font, as in the game's HUD. Font material is the font's own, no longer
+  borrowed from a game text. Option-row sizes still come from the option prefab, as
+  before.
+- Existing callers of `SulfurToastApi` / `SulfurPopupApi` / the options API need no
+  code change.
+- **Behaviour mods may notice:**
+  - After `ctx.Rebuild()`, the old `ctx` is dead: further calls on it do nothing.
+    The rebuild runs `BuildPage` again with a new context.
+  - Escape (and Enter on the category) on a custom page no longer rebuilds it, and
+    Escape keeps the scroll position. A mouse click on a foldout no longer switches
+    the page into keyboard-selection mode.
+  - A stacked text input's label row is no longer a separate navigation stop (the
+    input box is). Pages made only of library widgets no longer get a "No options."
+    row.
+  - `SulfurSettingRow`'s badge/button fields keep their English defaults; when a
+    field still holds that default, the localized text is shown instead.
+  - A duplicate page id is now a warning naming both registrations.
+- **Performance:** custom category buttons no longer poll and allocate every frame;
+  the language is no longer detected by scanning every loaded assembly every 0.5 s;
+  `SulfurLocalization.Get` no longer allocates; reflection lookups of game members
+  are cached and a missing member is logged once by name; page rebuilds detach the
+  old rows before destroying them, so layout doesn't run over both; the text caret
+  is only recomputed when it moves.
+- **Robustness:** each Harmony patch resolves its target up front; if a game update
+  removes one method, only that patch is skipped (with a warning) instead of every
+  patch after it.
+
 ## 0.10.1
 
 ### Fixed

@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "key": "ui.message.warning_prefix",
+      "value": "AVISO: "
+    },
+    {
+      "key": "ui.message.error_prefix",
+      "value": "ERRO: "
+    },
+    {
+      "key": "ui.message.success_prefix",
+      "value": "OK: "
+    },
+    {
+      "key": "ui.input.placeholder",
+      "value": "Insira o texto..."
+    },
+    {
+      "key": "ui.page.no_options",
+      "value": "Sem opções."
+    },
+    {
+      "key": "ui.badge.dirty",
+      "value": "Pendente"
+    },
+    {
+      "key": "ui.badge.clean",
+      "value": "Sem alterações"
+    },
+    {
+      "key": "ui.button.default",
+      "value": "Padrão"
+    },
+    {
+      "key": "ui.footer.apply",
+      "value": "Aplicar"
+    },
+    {
+      "key": "ui.foldout.mod_tag",
+      "value": "MOD"
+    },
+    {
+      "key": "ui.input.number_placeholder",
+      "value": "Insira o número..."
+    },
+    {
+      "key": "ui.page.load_failed",
+      "value": "Não foi possível carregar esta página. Consulte o log do BepInEx."
+    },
+    {
+      "key": "ui.badge.restart_required",
+      "value": "Reinício necessário"
+    },
+    {
+      "key": "ui.badge.live_apply",
+      "value": "Aplicação ao vivo"
+    },
+    {
+      "key": "ui.badge.advanced",
+      "value": "Avançado"
+    },
+    {
+      "key": "ui.badge.hidden",
+      "value": "Oculto"
+    },
+    {
+      "key": "ui.badge.dangerous",
+      "value": "Perigoso"
+    }
+  ]
+}

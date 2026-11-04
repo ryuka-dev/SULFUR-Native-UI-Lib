@@ -59,6 +59,9 @@
     <Reference Include="BepInEx">
       <HintPath>$(BepInExCoreDir)\BepInEx.dll</HintPath>
     </Reference>
+    <Reference Include="I2AsmDef">
+      <HintPath>$(SulfurManagedDir)\I2AsmDef.dll</HintPath>
+    </Reference>
     <Reference Include="PerfectRandom.Sulfur.Core">
       <HintPath>$(SulfurManagedDir)\PerfectRandom.Sulfur.Core.dll</HintPath>
     </Reference>
@@ -102,13 +105,18 @@
     <Compile Include="Core\Plugin.cs" />
     <Compile Include="Core\SulfurReflection.cs" />
     <Compile Include="Core\SulfurFontFallback.cs" />
+    <Compile Include="Core\SulfurFontRole.cs" />
+    <Compile Include="Core\SulfurFonts.cs" />
+    <Compile Include="Core\SulfurGameFonts.cs" />
     <Compile Include="Core\SulfurMessageKind.cs" />
     <Compile Include="Options\SulfurOptionsApi.cs" />
     <Compile Include="Options\SulfurOptionsPage.cs" />
     <Compile Include="Options\SulfurOptionsContext.cs" />
     <Compile Include="Integration\SulfurOptionsScreenBridge.cs" />
     <Compile Include="Integration\SulfurOptionsScreenPatch.cs" />
+    <Compile Include="Integration\SulfurMainMenuHoverGuard.cs" />
     <Compile Include="Integration\SulfurCustomCategoryMarker.cs" />
+    <Compile Include="Integration\SulfurNavigationProxy.cs" />
     <Compile Include="Rows\SulfurSettingRow.cs" />
     <Compile Include="Rows\SulfurSettingHandle.cs" />
     <Compile Include="Rows\SulfurTextHandle.cs" />
@@ -117,16 +125,23 @@
     <Compile Include="Rows\SulfurOptionsSettingRows.cs" />
     <Compile Include="Rows\SulfurOptionsFoldoutExtensions.cs" />
     <Compile Include="Rows\SulfurOptionBinding.cs" />
+    <Compile Include="Rows\SulfurOptionRowParts.cs" />
+    <Compile Include="Rows\SulfurToggleHandle.cs" />
+    <Compile Include="Rows\SulfurSliderHandle.cs" />
+    <Compile Include="Rows\SulfurCycleHandle.cs" />
+    <Compile Include="Rows\SulfurButtonRowNavigator.cs" />
     <Compile Include="Input\SulfurTextInputBinding.cs" />
     <Compile Include="Input\SulfurInputCaretOverlay.cs" />
     <Compile Include="Input\SulfurInputVisualState.cs" />
     <Compile Include="State\SulfurPageStateStore.cs" />
     <Compile Include="State\SulfurOptionsStateExtensions.cs" />
     <Compile Include="Localization\SulfurLocalization.cs" />
+    <Compile Include="Localization\SulfurGameLanguage.cs" />
+    <Compile Include="Localization\SulfurLanguage.cs" />
+    <Compile Include="Localization\SulfurUiText.cs" />
     <Compile Include="Popup\SulfurPopupApi.cs" />
     <Compile Include="Popup\SulfurPopupController.cs" />
     <Compile Include="Core\SulfurUiTheme.cs" />
-    <Compile Include="Core\SulfurUiFont.cs" />
     <Compile Include="Toast\SulfurToastApi.cs" />
     <Compile Include="Toast\SulfurToastView.cs" />
     <Compile Include="Toast\SulfurToastController.cs" />
@@ -141,6 +156,13 @@
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DeployDir)" SkipUnchangedFiles="false" />
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(DeployDir)" SkipUnchangedFiles="false" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
     <Message Importance="high" Text="Deployed $(TargetFileName) -> $(DeployDir)" />
+    <!-- The library's own UI text: lang/<code>.json next to the dll. -->
+    <ItemGroup>
+      <LangFiles Include="$(MSBuildProjectDirectory)\lang\*.json" />
+    </ItemGroup>
+    <MakeDir Directories="$(DeployDir)\lang" Condition=" '@(LangFiles)' != '' " />
+    <Copy SourceFiles="@(LangFiles)" DestinationFolder="$(DeployDir)\lang" SkipUnchangedFiles="false" Condition=" '@(LangFiles)' != '' " />
+    <Message Importance="high" Text="Deployed lang\*.json -> $(DeployDir)\lang" Condition=" '@(LangFiles)' != '' " />
     <!-- Also drop the dll into the Thunderstore packaging folder (gitignored). -->
     <MakeDir Directories="$(ThunderstoreDir)" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ThunderstoreDir)" SkipUnchangedFiles="false" />

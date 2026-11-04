@@ -245,11 +245,17 @@ namespace Ryuka.Sulfur.NativeUI
             if (row.ShowDefaultButton && row.OnDefault != null)
             {
                 ctx.AddSmallButton(
-                    string.IsNullOrWhiteSpace(row.DefaultButtonText) ? "Default" : row.DefaultButtonText,
+                    string.IsNullOrWhiteSpace(row.DefaultButtonText)
+                        ? SulfurUiText.DefaultButton
+                        : SulfurUiText.ForSettingRow(row.DefaultButtonText, SulfurSettingRow.BuiltInDefaultButtonText, SulfurUiText.DefaultButton),
                     row.OnDefault);
             }
         }
 
+        /// <summary>
+        /// The badge texts of <paramref name="row"/> as displayed: a text field still holding
+        /// its built-in English default is returned in the player's language.
+        /// </summary>
         public static List<string> BuildBadges(SulfurSettingRow row)
         {
             row = Normalize(row);
@@ -258,27 +264,27 @@ namespace Ryuka.Sulfur.NativeUI
 
             if (row.IsDirty)
             {
-                AddBadge(badges, row.DirtyText);
+                AddBadge(badges, SulfurUiText.SettingDirtyText(row.DirtyText));
             }
             else if (row.ShowCleanBadge)
             {
-                AddBadge(badges, row.CleanText);
+                AddBadge(badges, SulfurUiText.SettingCleanText(row.CleanText));
             }
 
             if (row.RequiresRestart)
-                AddBadge(badges, row.RestartRequiredText);
+                AddBadge(badges, SulfurUiText.ForSettingRow(row.RestartRequiredText, SulfurSettingRow.BuiltInRestartRequiredText, SulfurUiText.RestartRequiredBadge));
 
             if (row.LiveApply)
-                AddBadge(badges, row.LiveApplyText);
+                AddBadge(badges, SulfurUiText.ForSettingRow(row.LiveApplyText, SulfurSettingRow.BuiltInLiveApplyText, SulfurUiText.LiveApplyBadge));
 
             if (row.Advanced)
-                AddBadge(badges, row.AdvancedText);
+                AddBadge(badges, SulfurUiText.ForSettingRow(row.AdvancedText, SulfurSettingRow.BuiltInAdvancedText, SulfurUiText.AdvancedBadge));
 
             if (row.Hidden)
-                AddBadge(badges, row.HiddenText);
+                AddBadge(badges, SulfurUiText.ForSettingRow(row.HiddenText, SulfurSettingRow.BuiltInHiddenText, SulfurUiText.HiddenBadge));
 
             if (row.Dangerous)
-                AddBadge(badges, row.DangerousText);
+                AddBadge(badges, SulfurUiText.ForSettingRow(row.DangerousText, SulfurSettingRow.BuiltInDangerousText, SulfurUiText.DangerousBadge));
 
             if (row.ExtraBadges != null)
             {
@@ -341,7 +347,8 @@ namespace Ryuka.Sulfur.NativeUI
             int startIndex,
             SulfurSettingRow row)
         {
-            if (ctx == null || ctx.OptionsContainer == null || row == null)
+            // A closed/rebuilt context added no rows; its container is the live page's.
+            if (ctx == null || !ctx.IsAlive || ctx.OptionsContainer == null || row == null)
                 return;
 
             if (row.IndentLevel <= 0)

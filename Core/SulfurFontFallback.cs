@@ -25,7 +25,11 @@ namespace Ryuka.Sulfur.NativeUI
     /// CreateFontAsset(Font), which needs imported font data and fails for OS fonts.
     ///
     /// Idempotent and best-effort: if TMP or a suitable OS font is not ready yet, it
-    /// quietly does nothing and a later call retries.
+    /// quietly does nothing and a later call retries. Retries are rationed: a failed attempt
+    /// tries every candidate family (TMP logs each miss) and is slow, and callers ask once
+    /// per styled row. After the first quick retry, attempts are at least
+    /// <see cref="RetryIntervalSeconds"/> apart and stop after <see cref="MaxBuildAttempts"/>
+    /// (a system without any CJK font, e.g. Linux/Proton without fonts installed).
     /// </summary>
     internal static class SulfurFontFallback
     {
@@ -38,6 +42,15 @@ namespace Ryuka.Sulfur.NativeUI
         // Set once the CJK fallback is built (proves TMP is ready). Symbols are best-effort
         // in the same pass; a missing symbol font does not force endless retries.
         private static bool built;
+
+        // Failed-attempt rationing (see the class summary). The first retry is immediate: the
+        // attempt at plugin Awake can fail only because TMP is not ready yet, and the first
+        // options page should not wait for the interval.
+        private const float RetryIntervalSeconds = 30f;
+        private const int MaxBuildAttempts = 5;
+        private static int failedAttempts;
+        private static float nextAttemptTime;
+        private static readonly HashSet<string> missingSourceLogged = new HashSet<string>();
 
         // A fallback source: candidate OS font families (priority order) + a probe string
         // that a candidate must fully render to be accepted.
@@ -135,6 +148,12 @@ namespace Ryuka.Sulfur.NativeUI
             if (built)
                 return;
 
+            if (failedAttempts >= MaxBuildAttempts)
+                return;
+
+            if (failedAttempts >= 2 && Time.unscaledTime < nextAttemptTime)
+                return;
+
             try
             {
                 // CJK is the gate: if it can't build, TMP/the OS font isn't ready — retry
@@ -142,7 +161,10 @@ namespace Ryuka.Sulfur.NativeUI
                 // one-shot best-effort attempt (no endless retry if no symbol font exists).
                 TMP_FontAsset cjk = BuildFromSource(Sources[0]);
                 if (cjk == null)
+                {
+                    OnAttemptFailed();
                     return;
+                }
 
                 fallbackAssets.Add(cjk);
 
@@ -157,7 +179,20 @@ namespace Ryuka.Sulfur.NativeUI
             }
             catch (Exception e)
             {
-                Plugin.Log?.LogWarning("Glyph fallback setup failed (will retry): " + e.Message);
+                Plugin.Log?.LogWarning("Glyph fallback setup failed: " + e.Message);
+                OnAttemptFailed();
+            }
+        }
+
+        private static void OnAttemptFailed()
+        {
+            failedAttempts++;
+            nextAttemptTime = Time.unscaledTime + RetryIntervalSeconds;
+
+            if (failedAttempts >= MaxBuildAttempts)
+            {
+                Plugin.Log?.LogWarning(
+                    "Glyph fallback: giving up after " + failedAttempts + " attempts; non-Latin glyphs missing from the game font may not render.");
             }
         }
 
@@ -186,8 +221,13 @@ namespace Ryuka.Sulfur.NativeUI
                 return asset;
             }
 
-            Plugin.Log?.LogWarning(
-                "No loadable OS font found for " + source.Label + " glyph fallback; those glyphs may be unavailable.");
+            // Once per source: a failed CJK attempt is retried, the warning is not repeated.
+            if (missingSourceLogged.Add(source.Label))
+            {
+                Plugin.Log?.LogWarning(
+                    "No loadable OS font found for " + source.Label + " glyph fallback; those glyphs may be unavailable.");
+            }
+
             return null;
         }
 

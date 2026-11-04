@@ -1,15 +1,25 @@
-﻿using TMPro;
+﻿using System;
+using TMPro;
 using UnityEngine;
 
 namespace Ryuka.Sulfur.NativeUI
 {
+    /// <summary>
+    /// Marks an options-screen category button as one of the library's custom pages and keeps
+    /// its label showing the page's display name.
+    ///
+    /// Event-driven, no per-frame work. The game rewrites a category label only from
+    /// <c>OptionsScreenCategory.UpdateLabel</c> (called by <c>SetToCategory</c> and by the game's
+    /// language-change handler); a postfix on it calls <see cref="ForceApplyLabel"/>. The page
+    /// name itself may be localized by the owning mod, so it is re-resolved on
+    /// <see cref="SulfurLanguage.Changed"/>, which runs after the game's own handlers.
+    /// </summary>
     internal sealed class SulfurCustomCategoryMarker : MonoBehaviour
     {
         public string PageId;
 
         private TextMeshProUGUI[] labels;
-        private string lastAppliedText;
-        private int lastLanguageVersion = -1;
+        private Action<string> onLanguageChanged;
 
         public void Initialize(string pageId)
         {
@@ -20,13 +30,19 @@ namespace Ryuka.Sulfur.NativeUI
 
         private void OnEnable()
         {
-            CacheLabels();
-            ApplyLabelIfNeeded(true);
+            if (onLanguageChanged == null)
+                onLanguageChanged = OnLanguageChanged;
+
+            SulfurLanguage.Changed += onLanguageChanged;
+
+            // The language may have changed while this button was inactive.
+            ForceApplyLabel();
         }
 
-        private void LateUpdate()
+        private void OnDisable()
         {
-            ApplyLabelIfNeeded(false);
+            if (onLanguageChanged != null)
+                SulfurLanguage.Changed -= onLanguageChanged;
         }
 
         public void ApplyLabel()
@@ -48,46 +64,19 @@ namespace Ryuka.Sulfur.NativeUI
             if (string.IsNullOrWhiteSpace(text))
                 return;
 
-            lastAppliedText = text;
-            lastLanguageVersion = SulfurLocalization.LanguageVersion;
-
-            CacheLabels();
+            if (labels == null)
+                CacheLabels();
 
             foreach (TextMeshProUGUI label in labels)
             {
-                if (label != null)
+                if (label != null && label.text != text)
                     label.text = text;
             }
         }
 
-        private void ApplyLabelIfNeeded(bool force)
+        private void OnLanguageChanged(string languageCode)
         {
-            if (string.IsNullOrWhiteSpace(PageId))
-                return;
-
-            SulfurLocalization.RefreshCurrentLanguage(false);
-
-            if (!force && lastLanguageVersion == SulfurLocalization.LanguageVersion)
-            {
-                RestoreLabelIfOverwritten();
-                return;
-            }
-
             ForceApplyLabel();
-        }
-
-        private void RestoreLabelIfOverwritten()
-        {
-            if (string.IsNullOrWhiteSpace(lastAppliedText))
-                return;
-
-            CacheLabels();
-
-            foreach (TextMeshProUGUI label in labels)
-            {
-                if (label != null && label.text != lastAppliedText)
-                    label.text = lastAppliedText;
-            }
         }
 
         private void CacheLabels()

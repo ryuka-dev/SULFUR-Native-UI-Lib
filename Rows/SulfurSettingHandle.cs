@@ -49,10 +49,11 @@ namespace Ryuka.Sulfur.NativeUI
             if (statusBadgeText == null)
                 return;
 
-            string text = dirty ? dirtyText : cleanText;
+            // The row's built-in English defaults are shown in the player's language.
+            string text = dirty ? SulfurUiText.SettingDirtyText(dirtyText) : SulfurUiText.SettingCleanText(cleanText);
 
             if (string.IsNullOrWhiteSpace(text))
-                text = dirty ? "Dirty" : "Clean";
+                text = dirty ? SulfurUiText.DirtyBadge : SulfurUiText.CleanBadge;
 
             statusBadgeText.text = text;
         }
@@ -65,7 +66,7 @@ namespace Ryuka.Sulfur.NativeUI
             if (messageText == null)
                 return;
 
-            messageText.text = GetMessagePrefix(kind) + (text ?? "");
+            messageText.text = SulfurUiText.GetMessagePrefix(kind) + (text ?? "");
 
             if (messageBackground != null)
                 messageBackground.color = GetMessageBackground(kind);
@@ -122,21 +123,6 @@ namespace Ryuka.Sulfur.NativeUI
                     return new Color(0.28f, 1f, 0.46f, 0.10f);
                 default:
                     return new Color(1f, 1f, 1f, 0.06f);
-            }
-        }
-
-        private static string GetMessagePrefix(SulfurMessageKind kind)
-        {
-            switch (kind)
-            {
-                case SulfurMessageKind.Warning:
-                    return "WARNING: ";
-                case SulfurMessageKind.Error:
-                    return "ERROR: ";
-                case SulfurMessageKind.Success:
-                    return "OK: ";
-                default:
-                    return "";
             }
         }
     }

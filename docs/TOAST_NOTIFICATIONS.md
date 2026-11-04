@@ -53,8 +53,11 @@ SulfurToastApi.Show("Reloading level…", 2.5f);
     glide rather than jump when the stack changes.
 - **Passive** — no `GraphicRaycaster`, `CanvasGroup.blocksRaycasts = false`, no
   `Time.timeScale` change, no cursor-lock change. Toasts never intercept input.
-- **Language-correct font** — sampled from a live game `TextMeshProUGUI` (shared
-  with the banner via `SulfurUiFont`), so non-Latin languages render correctly.
+- **Language-correct font** — the game's own role fonts via `SulfurFonts`: the
+  title uses `SerifBold` and the body `SerifSemibold`, the roles the game uses for
+  its HUD alerts and small HUD text. Texts are bound, so a visible toast follows a
+  language change, and the CJK/symbol fallback sits on the font itself (it does not
+  depend on TMP's global fallback list, which the game clears).
 - **Lazy & cheap** — the overlay is created on the first `Show`; the per-frame
   update loop only runs while at least one toast exists.
 
@@ -69,7 +72,8 @@ off-white body text.
 - `Toast/SulfurToastApi.cs` — public entry point.
 - `Toast/SulfurToastController.cs` — persistent canvas, stacking layout, update loop.
 - `Toast/SulfurToastView.cs` — one card and its animation state machine.
-- `Core/SulfurUiTheme.cs`, `Core/SulfurUiFont.cs` — shared palette and font sampling.
+- `Core/SulfurUiTheme.cs` — shared palette.
+- `Core/SulfurFonts.cs` — role fonts (see the Fonts API in `API_REFERENCE.md`).
 
 ## Consumer wiring (SULFUR Together)
 

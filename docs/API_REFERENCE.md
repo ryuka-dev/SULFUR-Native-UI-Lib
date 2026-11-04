@@ -17,6 +17,10 @@ SulfurOptionsApi.RegisterPage(new SulfurOptionsPage
 });
 ```
 
+`PageId` is global across mods and compared case-insensitively. Registering
+another page with an id that is already registered replaces that page and logs
+a warning naming both.
+
 ### UnregisterPage
 
 Unregisters a page.
@@ -86,7 +90,32 @@ A page builder context.
 OptionsScreen OptionsScreen { get; }
 RectTransform OptionsContainer { get; }
 string PageId { get; }
+bool IsAlive { get; }
 ```
+
+### IsAlive
+
+```csharp
+if (ctx.IsAlive)
+    ctx.SetFooterStatus("Saved.");
+```
+
+True while this context's page is the page on screen. Every build of a page
+(opening it, `ctx.Rebuild()`, a foldout click) gets a new context, and the old
+one stops being alive for good when the page is rebuilt, another category is
+shown, or the options screen is hidden.
+
+On a context that is no longer alive:
+
+- `Rebuild`, `SetFooter`, `SetFooterStatus` and `ClearFooter` do nothing.
+- `Add*` / `BeginThemedGroup` / foldouts add nothing and log one warning per
+  context. Methods that return a row return `null`; `AddTextRow` and `AddList`
+  return an inert handle.
+- `SulfurListHandle.Update` / `Clear` of a list built by it do nothing.
+
+Keep using the context passed to the current `BuildPage` call. A callback that
+can run after its page went away (timer, network event, async result) should
+check `IsAlive` first, or go through a handle.
 
 ### Rebuild
 
@@ -94,7 +123,10 @@ string PageId { get; }
 ctx.Rebuild();
 ```
 
-Rebuilds the whole current custom page.
+Rebuilds the whole current custom page. Does nothing when the context is no
+longer alive or the options screen is not shown. The scroll position and the
+input mode are kept: a keyboard/gamepad user keeps the selected row, a mouse
+user gets no row selection.
 
 Do not use this for ordinary value changes. It is expensive.
 
@@ -167,7 +199,9 @@ Adds a simple section header.
 ctx.AddDescription("Description text.");
 ```
 
-Adds description text.
+Adds description text. Returns `null` (the return type is `OptionsScreenOption`
+for binary compatibility; the row is not a native option row). The same holds
+for `AddReadonlyText`.
 
 ### AddWarning
 
@@ -298,6 +332,78 @@ the context redirected into the list, so you compose rows with the normal `Add*`
 API. Also `Clear()` and `SetVisible(bool)`. Good for live tables (player + ping +
 per-row actions) refreshed on a timer or network event.
 
+### AddToggleRow / AddSliderRow / AddCycleRow → native row handles
+
+```csharp
+SulfurToggleHandle AddToggleRow(string label, bool value, Action<bool> onChanged);
+SulfurToggleHandle AddToggleRow(string label, string description, bool value, Action<bool> onChanged);
+
+SulfurSliderHandle AddSliderRow(string label, float value, float min, float max, float step, Action<float> onChanged);
+SulfurSliderHandle AddSliderRow(string label, string description, float value, float min, float max, float step, Action<float> onChanged);
+
+SulfurCycleHandle AddCycleRow(string label, IReadOnlyList<string> values, int currentIndex, Action<int, string> onChanged);
+SulfurCycleHandle AddCycleRow(string label, string description, IReadOnlyList<string> values, int currentIndex, Action<int, string> onChanged);
+```
+
+The same native rows as `AddToggle` / `AddSlider` / `AddCycle` (those keep
+returning `OptionsScreenOption`), returned as a handle so the page never has to
+reach into the game's private fields:
+
+| Member | Toggle | Slider | Cycle |
+|---|---|---|---|
+| `IsAlive` | row exists and its page is on screen | same | same |
+| value | `bool Value` | `float Value` | `int Index`, `string Value` |
+| set without `onChanged` | `SetValueWithoutNotify(bool)` | `SetValueWithoutNotify(float)` (clamped, not snapped) | `SetIndexWithoutNotify(int)` (clamped) |
+| `SetLocked(bool)`, `IsLocked` | yes | yes | yes |
+| `SetVisible(bool)` (row + its description) | yes | yes | yes |
+| `SetLabel(string)` | yes | yes | yes |
+
+`SetLocked(true)` dims the whole row uniformly (CanvasGroup alpha × 0.45),
+blocks mouse input, and turns keyboard/gamepad Use (toggle) and left/right
+(slider, cycle) into no-ops; a value change that still reaches a locked row is
+undone without calling `onChanged`. It never touches the label colour (the
+game's own `OptionsScreenOption.SetLocked` recolours the label with colours
+that are transparent on library-built rows, so the label disappears).
+`SetValueWithoutNotify` keeps working while locked.
+
+`AddSliderRow` also snaps **mouse drags** to `step` (when `step > 0`), the way
+left/right already moves by `step`, and calls `onChanged` only when the snapped
+value changes. `AddSlider` is unchanged (drags report every value).
+
+Handles stay valid while the row is hidden and shown again. After the page is
+closed or rebuilt, `IsAlive` is false and the members do nothing useful; take
+the new handle from the next `BuildPage`.
+
+Example: a host-authoritative session setting. The host edits it; on a client
+the row is locked and mirrors the host's value without saving it as the
+client's own preference:
+
+```csharp
+SulfurToggleHandle friendlyFire;
+
+public void BuildPage(SulfurOptionsContext ctx)
+{
+    friendlyFire = ctx.AddToggleRow(
+        "Friendly fire",
+        "Set by the host for the whole session.",
+        config.FriendlyFire,
+        v => config.FriendlyFire = v);   // only a host can change it
+
+    ApplySessionRole();
+}
+
+// Called from the page's timer / a session event:
+void ApplySessionRole()
+{
+    if (friendlyFire == null || !friendlyFire.IsAlive)
+        return;
+
+    bool isClient = session.IsClient;
+    friendlyFire.SetLocked(isClient);
+    friendlyFire.SetValueWithoutNotify(isClient ? session.FriendlyFire : config.FriendlyFire);
+}
+```
+
 ---
 
 ```csharp
@@ -387,6 +493,40 @@ Use the `Ex` methods for large pages and config editors.
 
 ---
 
+## Keyboard and gamepad navigation
+
+The options screen turns Unity's EventSystem navigation off, so arrow keys,
+Enter/Space and Escape (and the gamepad equivalents) reach only the game's own
+option rows. Every interactive library widget is part of that navigation, in
+screen order, with the game's own selection highlight (the white row border):
+
+| Widget | Use (Enter / A) | Left / right |
+|---|---|---|
+| foldout header (`AddFoldout*`) | toggles it; the same header stays selected | — |
+| `AddSmallButton`, `AddDefaultButton`, setting-row Default button | presses it (if interactable) | — |
+| `AddButtonRow` | presses the focused button | moves the focus between the buttons |
+| `AddTextInput` / `AddNumberInput` (and the setting text/number rows) | starts typing | — |
+| `AddInlineTextInput` / `AddInlineNumberInput` | starts typing | — |
+| footer primary button (`SetFooter`) | presses it (if it has an action) | — |
+
+- A **button row** is one navigation stop. The focused button carries a thin
+  white frame while the row is selected; hidden and non-interactable buttons are
+  skipped, and there is no wrap-around. A list refreshed with
+  `SulfurListHandle.Update` rebuilds its button rows, so their focus starts at
+  the first button again.
+- In a **text input**, typing, the caret keys and Enter/Escape belong to the
+  field. Enter or Escape ends editing and returns to row navigation with the same
+  row selected. A stacked input is one stop: the row with the box (its label row
+  above is not a separate stop any more).
+- The **footer** button is always the last stop of the page.
+- Rows hidden with `SetVisible(false)`, `SetActive(false)`, a collapsed foldout
+  or a hidden list are skipped.
+- Mouse behaviour and the look of unselected rows are unchanged. Hovering one of
+  these widgets with the mouse shows the widget's own hover tint, not the game's
+  border.
+
+---
+
 ## SulfurSettingRow
 
 ```csharp
@@ -425,6 +565,13 @@ public sealed class SulfurSettingRow
     public Action OnDefault;
 }
 ```
+
+The text fields default to English (`"Dirty"`, `"Clean"`, `"Restart Required"`,
+`"Live Apply"`, `"Advanced"`, `"Hidden"`, `"Dangerous"`, `"Default"`). A field
+that still holds exactly its default is displayed in the player's language (the
+library's own `lang` files); any other value is displayed unchanged (assigning
+the default string itself cannot be told apart from leaving the default). `SulfurOptionsSettingRows.BuildBadges` returns the
+texts as displayed.
 
 Recommended defaults for config editors:
 
@@ -535,3 +682,129 @@ string label = SulfurLocalization.Get(
 ```
 
 Fallback is used when no translation exists.
+
+---
+
+## Fonts API
+
+Fonts for text a mod builds itself, chosen the way the game chooses its own: by
+**role**, following the current language. The library's own surfaces (options rows,
+toasts, banner) use the same API.
+
+### SulfurFontRole
+
+```csharp
+SulfurFontRole.RoundRegular   // resource counters, "press to continue"
+SulfurFontRole.RoundSemibold  // button legends, rank text
+SulfurFontRole.RoundBold
+SulfurFontRole.SerifRegular   // menus, options screen, option rows
+SulfurFontRole.SerifSemibold  // small HUD text (floor info), dialogue body
+SulfurFontRole.SerifBold      // centred HUD alerts, character titles
+```
+
+The six values mirror the game's own font roles. In English the Round fonts are
+Latin-only; every font from this API carries a CJK/symbol fallback, so any role can
+show any language.
+
+### Get
+
+```csharp
+TMP_FontAsset font = SulfurFonts.Get(SulfurFontRole.SerifRegular);
+```
+
+The game's current font for the role, with glyph fallback attached. While the
+game's language assets are still loading — or on a game version without the role
+mechanism — it returns TMP's default font (also with fallback). There is no lookup
+by font name: names change between game versions and do not follow the language.
+
+### Bind
+
+```csharp
+SulfurFonts.Bind(myText, SulfurFontRole.SerifBold);
+```
+
+Sets the role's font and the font's own material now, and keeps the text on that
+role: when the player changes language, the text switches font automatically.
+Binding the same text again replaces its role. Texts are held weakly; destroyed
+texts drop out on their own. Size, colour and style stay yours.
+
+### WithFallback
+
+```csharp
+TMP_FontAsset own = SulfurFonts.WithFallback(myBundledFont);
+```
+
+Attaches the library's CJK and symbol fallback to a font your mod ships, so it
+renders missing glyphs like the fonts from `Get`. Idempotent; returns the same font.
+
+### FontsChanged
+
+```csharp
+SulfurFonts.FontsChanged += () => RebuildMyCachedStyles();
+```
+
+Raised on the main thread after the game's role fonts changed. Bound texts are
+already updated when it fires; subscribe only if you keep font assets yourself.
+
+---
+
+## Language API
+
+`SulfurLanguage` is the game's current UI language and one notification when it
+becomes known or changes. Use it instead of reading I2 Localization or subscribing
+to the game's `onLanguageChange` yourself. No game or I2 types appear in it.
+
+### Follow
+
+```csharp
+IDisposable languageFollow = SulfurLanguage.Follow(code => RefreshMyTexts());
+// later, when the UI goes away:
+languageFollow.Dispose();
+```
+
+`IDisposable Follow(Action<string> onLanguage)` calls `onLanguage` with the current
+code right away if the language is already known, otherwise once it becomes known,
+and then after every change. Dispose the result to stop. This is the one call most
+mods need. Exceptions thrown by the callback are logged as warnings and swallowed.
+
+### Code
+
+```csharp
+string code = SulfurLanguage.Code; // "en", "zh-CN", "ja", ...
+```
+
+`string Code { get; }`: the I2 language code, which is also the
+`lang/<code>.json` file name. `"en"` until `IsReady`.
+
+### IsReady
+
+`bool IsReady { get; }`: true once the game's language is known. The game sets its
+startup language without raising an event, so the library checks once per frame
+until the game has finished loading and reports a code, then stops checking.
+
+### IsRightToLeft
+
+`bool IsRightToLeft { get; }`: true for a right-to-left language (Arabic).
+
+### FixRtl
+
+```csharp
+label.text = SulfurLanguage.FixRtl(SulfurLocalization.Get(PluginGuid, "hud.title", "Title"));
+```
+
+`string FixRtl(string text)`: shapes the text for display when the language is
+right to left, the same way the game shapes its own translations; otherwise returns
+it unchanged. Call it once when you resolve the text, not every frame.
+
+### Changed
+
+```csharp
+SulfurLanguage.Changed += code => RefreshMyTexts();
+```
+
+`event Action<string> Changed`: raised on the main thread once when the language
+first becomes known, then after every change (only when the code actually changed).
+On a change it runs after all of the game's own language-change handlers, so text
+you set is not overwritten by the game. Each subscriber runs in its own try/catch.
+`SulfurLocalization.CurrentLanguageCode` and `LanguageVersion` are already updated
+when it fires. Prefer `Follow`, which also covers the initial language.

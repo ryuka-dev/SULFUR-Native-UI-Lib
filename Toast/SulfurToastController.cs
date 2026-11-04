@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -29,14 +28,15 @@ namespace Ryuka.Sulfur.NativeUI
 
         private const float DefaultDuration = 4f;
 
+        // Same roles the game uses for its own HUD alerts (SerifBold) and small HUD text
+        // (SerifSemibold), so toasts read as game UI and follow the language.
+        internal const SulfurFontRole TitleRole = SulfurFontRole.SerifBold;
+        internal const SulfurFontRole MessageRole = SulfurFontRole.SerifSemibold;
+
         private static SulfurToastController instance;
 
         // Index 0 = newest = top of the stack.
         private readonly List<SulfurToastView> toasts = new List<SulfurToastView>();
-
-        private bool fontResolved;
-        private TMP_FontAsset font;
-        private Material fontMaterial;
 
         public static SulfurToastController Instance
         {
@@ -75,12 +75,9 @@ namespace Ryuka.Sulfur.NativeUI
             if (string.IsNullOrEmpty(title) && string.IsNullOrEmpty(message))
                 return;
 
-            EnsureFont();
-
             float duration = durationSeconds > 0f ? durationSeconds : DefaultDuration;
 
-            SulfurToastView view = SulfurToastView.Create(
-                transform, font, fontMaterial, title, message, duration);
+            SulfurToastView view = SulfurToastView.Create(transform, title, message, duration);
 
             toasts.Insert(0, view);
 
@@ -137,25 +134,6 @@ namespace Ryuka.Sulfur.NativeUI
                     toasts.RemoveAt(i);
                 }
             }
-        }
-
-        private void EnsureFont()
-        {
-            if (fontResolved)
-                return;
-
-            TextMeshProUGUI sample = SulfurUiFont.FindLiveGameText(transform);
-            if (sample != null && sample.font != null)
-            {
-                font = sample.font;
-                fontMaterial = sample.fontSharedMaterial;
-                fontResolved = true;
-                return;
-            }
-
-            // Temporary fallback: readable now, retried (and upgraded) on next Show.
-            if (font == null && TMP_Settings.defaultFontAsset != null)
-                font = TMP_Settings.defaultFontAsset;
         }
     }
 }

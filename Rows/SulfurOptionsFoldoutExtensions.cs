@@ -165,6 +165,9 @@ namespace Ryuka.Sulfur.NativeUI
             SulfurFoldoutStyle style,
             UnityAction onPressed)
         {
+            if (!ctx.EnsureAlive("AddFoldout"))
+                return;
+
             RectTransform parent = ctx.OptionsContainer;
             if (parent == null)
                 return;
@@ -233,7 +236,14 @@ namespace Ryuka.Sulfur.NativeUI
             CreateFoldoutText(row.transform, label, expanded, style, sample, baseColor);
 
             if (style == SulfurFoldoutStyle.Plugin)
-                CreateRightTag(row.transform, "MOD", sample, baseColor);
+                CreateRightTag(row.transform, SulfurUiText.ModTag, sample, baseColor);
+
+            // Keyboard/gamepad: Use on the header toggles it like a click. The rebuild keeps
+            // the selected index, so the same header stays selected.
+            ctx.RegisterNavigationProxy(rowRt, delegate
+            {
+                SulfurNavigationProxy.Press(button);
+            });
         }
 
         private static void CreateAccentLine(Transform parent, Color color)
@@ -402,30 +412,6 @@ namespace Ryuka.Sulfur.NativeUI
                 text.fontSize = 13f;
                 text.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.62f);
             }
-        }
-
-        private static TextMeshProUGUI FindSampleText(RectTransform parent)
-        {
-            if (parent == null)
-                return null;
-
-            TextMeshProUGUI[] texts = parent.GetComponentsInChildren<TextMeshProUGUI>(true);
-
-            foreach (TextMeshProUGUI text in texts)
-            {
-                if (text != null && text.font != null)
-                    return text;
-            }
-
-            return null;
-        }
-
-        private static float GetRowWidth(RectTransform parent)
-        {
-            if (parent != null && parent.rect.width > 100f)
-                return parent.rect.width;
-
-            return 900f;
         }
 
         private static string SafeName(string value)

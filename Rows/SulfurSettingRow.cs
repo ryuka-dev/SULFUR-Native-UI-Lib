@@ -19,19 +19,31 @@ namespace Ryuka.Sulfur.NativeUI
         public bool Hidden;
         public bool Dangerous;
 
-        public string DirtyText = "Dirty";
-        public string CleanText = "Clean";
-        public string RestartRequiredText = "Restart Required";
-        public string LiveApplyText = "Live Apply";
-        public string AdvancedText = "Advanced";
-        public string HiddenText = "Hidden";
-        public string DangerousText = "Dangerous";
+        // Built-in English defaults of the text fields below. A field still holding its
+        // default is displayed in the player's language (see SulfurUiText.ForSettingRow); a
+        // value the mod set itself is displayed as is.
+        internal const string BuiltInDirtyText = "Dirty";
+        internal const string BuiltInCleanText = "Clean";
+        internal const string BuiltInRestartRequiredText = "Restart Required";
+        internal const string BuiltInLiveApplyText = "Live Apply";
+        internal const string BuiltInAdvancedText = "Advanced";
+        internal const string BuiltInHiddenText = "Hidden";
+        internal const string BuiltInDangerousText = "Dangerous";
+        internal const string BuiltInDefaultButtonText = "Default";
+
+        public string DirtyText = BuiltInDirtyText;
+        public string CleanText = BuiltInCleanText;
+        public string RestartRequiredText = BuiltInRestartRequiredText;
+        public string LiveApplyText = BuiltInLiveApplyText;
+        public string AdvancedText = BuiltInAdvancedText;
+        public string HiddenText = BuiltInHiddenText;
+        public string DangerousText = BuiltInDangerousText;
 
         public string[] ExtraBadges;
 
         public bool ShowCleanBadge = true;
         public bool ShowDefaultButton = true;
-        public string DefaultButtonText = "Default";
+        public string DefaultButtonText = BuiltInDefaultButtonText;
         public Action OnDefault;
 
         public string Message;
