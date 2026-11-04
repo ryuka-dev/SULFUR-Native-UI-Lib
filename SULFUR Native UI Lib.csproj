@@ -172,5 +172,8 @@
     <MakeDir Directories="$(ThunderstoreDir)" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ThunderstoreDir)" SkipUnchangedFiles="false" />
     <Message Importance="high" Text="Deployed $(TargetFileName) -> $(ThunderstoreDir)" />
+    <!-- The package ships lang/ next to the dll; the packaging script zips Thunderstore/lang. -->
+    <MakeDir Directories="$(ThunderstoreDir)\lang" Condition=" '@(LangFiles)' != '' " />
+    <Copy SourceFiles="@(LangFiles)" DestinationFolder="$(ThunderstoreDir)\lang" SkipUnchangedFiles="false" Condition=" '@(LangFiles)' != '' " />
   </Target>
 </Project>

@@ -14,8 +14,12 @@ Bump together (they drift otherwise):
 ## Package
 
 - The zip must contain `lang/*.json` (14 files) next to the DLL. Without them the
-  library's own text silently falls back to English. The csproj copies `lang/` to the
-  deploy profile only; the packaging step must add it.
+  library's own text silently falls back to English. The build copies the root `lang/`
+  into `Thunderstore/lang/` (gitignored) next to the DLL; the packaging script
+  (`sulfur-thunderstore` pack) zips that folder.
+- The packaging script also expects `Thunderstore/CHANGELOG.md` (first line `# Changelog`,
+  top entry `## <manifest version>`), which this repository does not have yet: the
+  changelog still lives inside `Thunderstore/README.md`. Split it out before packing.
 - `lang/*.json` must stay LF without BOM (`.gitattributes` pins them).
 
 ## Compatibility with published dependents

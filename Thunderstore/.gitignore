@@ -4,3 +4,6 @@
 
 # Built Thunderstore package archives.
 *.zip
+
+# Copied from the repository root lang/ at build time.
+lang/
