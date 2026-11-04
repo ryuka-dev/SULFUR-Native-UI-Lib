@@ -8,7 +8,7 @@ Bump together (they drift otherwise):
 - `Properties/AssemblyInfo.cs` `AssemblyVersion` / `AssemblyFileVersion`
 - `Thunderstore/manifest.json` `version_number`
 - `README.md` "Current target version"
-- `CHANGELOG.md` and `Thunderstore/README.md` (player-facing changelog)
+- `CHANGELOG.md` and `Thunderstore/CHANGELOG.md` (player-facing changelog)
 - the mod registry entry (`version`) after publishing
 
 ## Package
@@ -19,9 +19,12 @@ Bump together (they drift otherwise):
   (`sulfur-thunderstore` pack) zips that folder.
 - The build also puts `SULFUR Native UI Lib.xml` (documentation comments, for IDEs) next
   to the DLL in `Thunderstore/`; ship it.
-- The packaging script also expects `Thunderstore/CHANGELOG.md` (first line `# Changelog`,
-  top entry `## <manifest version>`), which this repository does not have yet: the
-  changelog still lives inside `Thunderstore/README.md`. Split it out before packing.
+- `Thunderstore/CHANGELOG.md` is the player-facing changelog, newest first; its top entry
+  must be `## <manifest version>`. `Thunderstore/README.md` is the store page only.
+- Pack with the `sulfur-thunderstore` script. Build first with
+  `dotnet build -c Release -p:DeployDir=<scratch folder>` and pack with `-NoBuild`; a plain
+  build also deploys into the csproj's default profile. Check the zip: DLL, XML, `lang/`
+  (14), manifest, icon, README, CHANGELOG — nothing else.
 - `lang/*.json` must stay LF without BOM (`.gitattributes` pins them).
 
 ## Compatibility with published dependents

@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Thunderstore packaging folder: build output and packages are not committed.
+Thunderstore/*.dll
+Thunderstore/*.pdb
+Thunderstore/*.xml
+Thunderstore/*.zip
+Thunderstore/lang/

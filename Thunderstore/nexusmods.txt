@@ -1,0 +1,152 @@
+[font=Arial Black][color=DarkOrange][size=5][b]SULFUR Native UI Lib[/b][/size][/color][/font]
+
+A library that lets SULFUR mods add their own pages to the game's native Options screen and
+show messages during play.
+
+[color=RoyalBlue][b]For players[/b][/color]
+
+This mod does nothing by itself. Install it when another mod lists it as a dependency.
+
+[color=RoyalBlue][b]Features[/b][/color]
+
+[list]
+[*]Mod pages in the Options screen, built from the game's own rows: toggles, sliders,[/*]
+[/list]
+  choices, buttons, text and number inputs, foldouts, badges, a footer with a primary button
+[list]
+[*]Rows that update in place while the page is open[/*]
+[*]Full keyboard and gamepad navigation[/*]
+[*]Toast notifications in the top-right corner[/*]
+[*]A centred message banner during play[/*]
+[*]The game's fonts for the current language, with automatic glyph fallback for Chinese,[/*]
+[/list]
+  Japanese, Korean and symbols
+[list]
+[*]Follows the game's language; the library's own text is translated into all 14 game[/*]
+[/list]
+  languages
+
+[color=RoyalBlue][b]Installation[/b][/color]
+
+Install with a mod manager, or by hand:
+
+[code]BepInEx/plugins/ryuka_labs-SULFUR_Native_UI_Lib/
+├─ SULFUR Native UI Lib.dll
+└─ lang/[/code]
+Keep the [color=#ffff00]lang/[/color] folder next to the DLL; without it the library's own text shows in English.
+
+[color=RoyalBlue][b]Requirements[/b][/color]
+
+[list]
+[*]SULFUR 1.0.4[/*]
+[*]BepInEx 5 (BepInExPack 5.4.2100)[/*]
+[/list]
+[color=RoyalBlue][b]For mod developers[/b][/color]
+
+Source and documentation: https://github.com/ryuka-dev/SULFUR-Native-UI-Lib
+
+The repository contains only the library's own source and documentation, no game files or
+third-party binaries.
+
+[font=Arial Black][color=DarkOrange][size=5][b]Changelog[/b][/size][/color][/font]
+
+[color=RoyalBlue][b]0.11.0[/b][/color]
+Fixed
+[list]
+[*]Toasts and the popup banner no longer lose Chinese (and other non-Latin) characters, and no longer change font from one session to the next. They now use the game's own fonts for the current language and follow a language change while shown.[/*]
+[*]Button rows in custom Options pages no longer show a stray vertical "1 0 0 %" next to the label.[/*]
+[*]Keyboard and gamepad navigation on mod Options pages: every control can now be reached and used, hidden rows are skipped, and refreshed lists no longer cause errors or a wrong order.[/*]
+[*]Typing a space in a mod's text box no longer rebuilds the page; toggles and sliders keep saving after being hidden; a mod page that fails to build shows a message instead of a blank page.[/*]
+[*]Gamepad users get the Resume button selected in the pause menu again.[/*]
+[/list]
+Added
+[list]
+[*][color=#ffff00]SulfurFonts[/color] for mod developers: [color=#ffff00]Get(role)[/color] returns the game's font for one of its six font roles, [color=#ffff00]Bind(text, role)[/color] keeps a text on that role across language changes, and [color=#ffff00]WithFallback(font)[/color] gives a mod's own font the same CJK/symbol coverage.[/*]
+[*][color=#ffff00]SulfurLanguage.Follow(...)[/color] for mod developers: one call to follow the game's language, including the startup language, notified after the game's own handlers.[/*]
+[*]Row handles ([color=#ffff00]AddToggleRow[/color] / [color=#ffff00]AddSliderRow[/color] / [color=#ffff00]AddCycleRow[/color]) with set-without-notify, lock, hide and relabel.[/*]
+[*]The library's own text is translated into all 14 game languages.[/*]
+[/list]
+[color=RoyalBlue][b]0.10.1[/b][/color]
+Fixed
+[list]
+[*]Small-button width now actually applies. Previously the [color=#ffff00]minWidth[/color] argument and the label-based auto-size had no effect on the rendered width, so every small button stayed at a fixed 120px and labels longer than ~10 characters were cut off with an ellipsis (e.g. [color=#ffff00]Open-source repo[/color] → [color=#ffff00]Open-sourc…[/color]). Buttons now size to their label, and an explicit [color=#ffff00]minWidth[/color] widens them as intended.[/*]
+[/list]
+[color=RoyalBlue][b]0.10.0[/b][/color]
+Added
+[list]
+[*][color=#ffff00]AddButtonRow(...)[/color] for mod developers: lays several small buttons out left-to-right in one row instead of one stacked row per button. [color=#ffff00]AddSmallButton[/color] is unchanged for the single-button case.[/*]
+[*]Live-update row handles so a page can change parts of itself while open without a full rebuild: [color=#ffff00]AddTextRow[/color] returns a [color=#ffff00]SulfurTextHandle[/color], [color=#ffff00]AddButtonRow[/color] returns per-button [color=#ffff00]SulfurButtonHandle[/color]s, and [color=#ffff00]AddList[/color] returns a [color=#ffff00]SulfurListHandle[/color] for refreshable sections.[/*]
+[*]Automatic missing-glyph fallback built from installed OS fonts (a broad CJK face plus a symbol face), applied per-glyph on top of the game's active font. Fixes blank rows and missing symbols (e.g. checkmarks) in non-English languages without any bundled font assets.[/*]
+[/list]
+Changed
+[list]
+[*][color=#ffff00]AddButtonRow[/color] now returns [color=#ffff00]IReadOnlyList<SulfurButtonHandle>[/color] instead of [color=#ffff00]void[/color]. It was introduced in this same release and had not shipped before, so no released API is affected.[/*]
+[/list]
+[color=RoyalBlue][b]0.9.0[/b][/color]
+Added
+[list]
+[*]New in-game toast notifications for mod developers ([color=#ffff00]SulfurToastApi.Show[/color]): short messages that slide into the top-right corner during gameplay, hold briefly, then animate away. Supports an optional title and custom duration, and multiple toasts stack with smooth slide/fade animations. Display-only and passive — it never pauses the game, captures input, or changes the cursor.[/*]
+[/list]
+[color=RoyalBlue][b]0.8.0[/b][/color]
+Added
+[list]
+[*]New in-game popup banner for mod developers ([color=#ffff00]SulfurPopupApi.ShowBanner[/color] / [color=#ffff00]HideBanner[/color]): a single centered, persistent on-screen message that can appear during normal gameplay and combat, styled to match the game's UI. It is display-only — it never pauses the game, captures input, or changes the cursor, so the calling mod keeps full control of any keypress.[/*]
+[/list]
+[color=RoyalBlue][b]0.7.3[/b][/color]
+Fixed
+[list]
+[*]Fixed custom rows (badges, descriptions, section headers, text/number inputs) showing as blank boxes in non-English languages such as Chinese, Japanese, Korean, and Russian. They now use the game's current language font instead of the default Latin font.[/*]
+[/list]
+[color=RoyalBlue][b]0.7.2[/b][/color]
+Added
+[list]
+[*]New inline input rows for mod developers ([color=#ffff00]AddInlineTextInput[/color] / [color=#ffff00]AddInlineNumberInput[/color]): the label and input field sit on the same line, matching the vanilla Options layout, with optional password masking.[/*]
+[/list]
+Fixed
+[list]
+[*]Fixed text and option font sizes shrinking a little every time a page refreshed (for example on each edit in a config editor), until the Options screen was reopened.[/*]
+[/list]
+[color=RoyalBlue][b]0.7.1[/b][/color]
+Fixed
+[list]
+[*]Fixed an issue where custom Native UI pages could disappear every second time the Options menu was opened.[/*]
+[*]Custom option categories are now rebuilt more safely when the game Options screen is opened again.[/*]
+[*]Improved custom category cleanup to avoid stale category buttons, invalid category references, or mismatched OptionsScreen state.[/*]
+[*]Improved custom category label refreshing so labels remain valid after the game UI is rebuilt or re-enabled.[/*]
+[/list]
+Changed
+[list]
+[*]Native UI custom categories are now recreated after OptionsScreen setup instead of relying on old injected category objects.[/*]
+[*]This should make custom pages more stable when closing and reopening the Options menu with ESC.[/*]
+[/list]
+[color=RoyalBlue][b]0.7.0[/b][/color]
+
+[list]
+[*]Reworked localization loading: searches multiple folders for language files, auto-detects language files by name, merges entries from several sources, and follows the current game language.[/*]
+[/list]
+[color=RoyalBlue][b]0.6.3[/b][/color]
+
+[list]
+[*]Added themed section group documentation standard.[/*]
+[*]Added guidance for large config editor pages.[/*]
+[*]Improved foldout hierarchy styling standard.[/*]
+[*]Added row-handle based update pattern for high-performance UI updates.[/*]
+[*]Documented that normal value edits should not rebuild the whole page.[/*]
+[*]Documented ASCII foldout arrows for TMP font compatibility.[/*]
+[*]Documented themed group border behavior and Unity Outline pitfalls.[/*]
+[/list]
+[color=RoyalBlue][b]0.6.2[/b][/color]
+
+[list]
+[*]Added [color=#ffff00]SulfurSettingHandle[/color].[/*]
+[*]Added high-performance [color=#ffff00]AddSettingToggleEx[/color], [color=#ffff00]AddSettingTextEx[/color], [color=#ffff00]AddSettingNumberEx[/color], and [color=#ffff00]AddSettingCycleEx[/color].[/*]
+[*]Cached sample text and native option width per page context.[/*]
+[*]Preserved existing [color=#ffff00]AddSettingToggle[/color], [color=#ffff00]AddSettingText[/color], [color=#ffff00]AddSettingNumber[/color], and [color=#ffff00]AddSettingCycle[/color] APIs.[/*]
+[/list]
+[color=RoyalBlue][b]0.6.1[/b][/color]
+
+[list]
+[*]Added custom Options page registration.[/*]
+[*]Added basic native-style row creation helpers.[/*]
+[*]Added localization helper support.[/*]
+[/list]
