@@ -35,7 +35,17 @@ namespace Ryuka.Sulfur.NativeUI
         /// <summary>Number rows: the field's value model (parse, clamp, last accepted value).</summary>
         public SulfurNumberInput Number;
 
+        /// <summary>
+        /// The badge row; always built for a handle, inactive while it has no badges, so the
+        /// handle can add a status badge later.
+        /// </summary>
         public GameObject BadgeRow;
+
+        /// <summary>The status badge (dirty / clean) in <see cref="BadgeRow"/>, null while the row shows none.</summary>
+        public GameObject StatusBadge;
+
+        /// <summary>The context that built the row; it creates a status badge added later.</summary>
+        public SulfurOptionsContext Context;
 
         /// <summary>The message line; always built for a handle, inactive while the message is empty.</summary>
         public GameObject MessageRow;

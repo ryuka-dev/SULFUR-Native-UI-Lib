@@ -44,8 +44,7 @@ context returns an empty list. Check `Count`.
 
 - Rows built with `AddSettingToggle` (no `Ex`) give no handle; use `AddSettingToggleEx`
   and friends.
-- `SetDirty` rewrites the row's first badge. With `ShowCleanBadge = false` and
-  `IsDirty = false` at build time, that is another badge or none.
+- While clean, a row with `ShowCleanBadge = false` shows no status badge by design.
 
 ## A row's label disappears after locking it
 

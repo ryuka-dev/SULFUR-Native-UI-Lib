@@ -537,7 +537,7 @@ handle can show them later; a hidden part takes no space and is no navigation st
 
 | `SulfurSettingHandle` | |
 |---|---|
-| `SetDirty(bool dirty)`, `SetDirty(bool dirty, string dirtyText, string cleanText)` | rewrites the row's **first** badge with the dirty or clean text. Needs that badge to be the status badge: keep `ShowCleanBadge = true` or build with `IsDirty = true`. Only the status badge changes; flag badges and `ExtraBadges` stay as built. |
+| `SetDirty(bool dirty)`, `SetDirty(bool dirty, string dirtyText, string cleanText)` | shows the status badge (leftmost) with the dirty or clean text, adding or removing it as needed; while clean with `ShowCleanBadge = false` the row has none. Flag badges and `ExtraBadges` stay as built. |
 | `SetMessage(string text, SulfurMessageKind kind)` | shows the message line; empty text hides it |
 | `SetActive(bool)` | hides / shows the whole block; an empty message line and a hidden Default button stay hidden |
 | `bool SetDefaultButtonVisible(bool)` | `false` when the row has no `OnDefault` or is gone |

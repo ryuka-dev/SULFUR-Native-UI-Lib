@@ -17,6 +17,8 @@ Bump together (they drift otherwise):
   library's own text silently falls back to English. The build copies the root `lang/`
   into `Thunderstore/lang/` (gitignored) next to the DLL; the packaging script
   (`sulfur-thunderstore` pack) zips that folder.
+- The build also puts `SULFUR Native UI Lib.xml` (documentation comments, for IDEs) next
+  to the DLL in `Thunderstore/`; ship it.
 - The packaging script also expects `Thunderstore/CHANGELOG.md` (first line `# Changelog`,
   top entry `## <manifest version>`), which this repository does not have yet: the
   changelog still lives inside `Thunderstore/README.md`. Split it out before packing.

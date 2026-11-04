@@ -12,6 +12,10 @@
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
+    <!-- XML docs next to the dll: IntelliSense for mods that reference it. Members without
+         a comment are fine (CS1591 off); a broken comment still warns. -->
+    <DocumentationFile>bin\$(Configuration)\$(AssemblyName).xml</DocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
   <!--
     Reference and deploy locations. Override any of these from the command line
@@ -160,6 +164,7 @@
     <MakeDir Directories="$(DeployDir)" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DeployDir)" SkipUnchangedFiles="false" />
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(DeployDir)" SkipUnchangedFiles="false" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).xml" DestinationFolder="$(DeployDir)" SkipUnchangedFiles="false" Condition="Exists('$(TargetDir)$(TargetName).xml')" />
     <Message Importance="high" Text="Deployed $(TargetFileName) -> $(DeployDir)" />
     <!-- The library's own UI text: lang/<code>.json next to the dll. -->
     <ItemGroup>
@@ -171,6 +176,7 @@
     <!-- Also drop the dll into the Thunderstore packaging folder (gitignored). -->
     <MakeDir Directories="$(ThunderstoreDir)" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ThunderstoreDir)" SkipUnchangedFiles="false" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).xml" DestinationFolder="$(ThunderstoreDir)" SkipUnchangedFiles="false" Condition="Exists('$(TargetDir)$(TargetName).xml')" />
     <Message Importance="high" Text="Deployed $(TargetFileName) -> $(ThunderstoreDir)" />
     <!-- The package ships lang/ next to the dll; the packaging script zips Thunderstore/lang. -->
     <MakeDir Directories="$(ThunderstoreDir)\lang" Condition=" '@(LangFiles)' != '' " />

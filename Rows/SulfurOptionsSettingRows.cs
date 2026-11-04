@@ -333,7 +333,9 @@ namespace Ryuka.Sulfur.NativeUI
             bool forHandle = parts != null;
 
             List<string> badges = BuildBadges(row);
-            GameObject badgeRow = badges.Count > 0 ? ctx.AddBadgeRowObject(badges) : null;
+            GameObject badgeRow = forHandle
+                ? ctx.AddBadgeRowObject(badges, true)
+                : badges.Count > 0 ? ctx.AddBadgeRowObject(badges) : null;
 
             GameObject messageRow = ctx.AddMessageRow(row.Message, row.MessageKind, forHandle);
 
@@ -353,7 +355,13 @@ namespace Ryuka.Sulfur.NativeUI
 
             if (parts != null)
             {
+                parts.Context = ctx;
                 parts.BadgeRow = badgeRow;
+
+                // BuildBadges puts the status badge first whenever the row shows one.
+                if (badgeRow != null && badgeRow.transform.childCount > 0 && BuildStatusBadge(row) != null)
+                    parts.StatusBadge = badgeRow.transform.GetChild(0).gameObject;
+
                 parts.MessageRow = messageRow;
                 parts.DefaultButtonRow = defaultButtonRow;
             }
@@ -369,14 +377,7 @@ namespace Ryuka.Sulfur.NativeUI
 
             List<string> badges = new List<string>();
 
-            if (row.IsDirty)
-            {
-                AddBadge(badges, SulfurUiText.SettingDirtyText(row.DirtyText));
-            }
-            else if (row.ShowCleanBadge)
-            {
-                AddBadge(badges, SulfurUiText.SettingCleanText(row.CleanText));
-            }
+            AddBadge(badges, BuildStatusBadge(row));
 
             if (row.RequiresRestart)
                 AddBadge(badges, SulfurUiText.ForSettingRow(row.RestartRequiredText, SulfurSettingRow.BuiltInRestartRequiredText, SulfurUiText.RestartRequiredBadge));
@@ -400,6 +401,23 @@ namespace Ryuka.Sulfur.NativeUI
             }
 
             return badges;
+        }
+
+        // The status badge as built: the dirty text while dirty, the clean text while clean
+        // when ShowCleanBadge is set, otherwise none (null). Expects a normalized row.
+        internal static string BuildStatusBadge(SulfurSettingRow row)
+        {
+            string text = row.IsDirty
+                ? SulfurUiText.SettingDirtyText(row.DirtyText)
+                : row.ShowCleanBadge ? SulfurUiText.SettingCleanText(row.CleanText) : null;
+
+            return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+        }
+
+        // Badge text size in the compact (indented) setting-row style.
+        internal static float CompactBadgeFontSize(float fontSize)
+        {
+            return Mathf.Clamp(fontSize * 0.82f, 11f, 13f);
         }
 
         private static SulfurSettingHandle CreateHandle(
@@ -535,7 +553,7 @@ namespace Ryuka.Sulfur.NativeUI
                 }
                 else if (isBadge)
                 {
-                    text.fontSize = Mathf.Clamp(text.fontSize * 0.82f, 11f, 13f);
+                    text.fontSize = CompactBadgeFontSize(text.fontSize);
                 }
                 else if (isMessage)
                 {

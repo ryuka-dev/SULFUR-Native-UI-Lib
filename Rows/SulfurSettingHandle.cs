@@ -21,7 +21,13 @@ namespace Ryuka.Sulfur.NativeUI
         private readonly List<Transform> createdChildren = new List<Transform>();
         private readonly SulfurSettingRow row;
         private readonly SulfurSettingParts parts;
-        private readonly TextMeshProUGUI statusBadgeText;
+        private readonly GameObject badgeRow;
+        private readonly SulfurOptionsContext context;
+        private GameObject statusBadge;
+
+        // Rows found by name (no build-time parts): the first badge label, changed in place.
+        private readonly TextMeshProUGUI legacyStatusText;
+
         private readonly TextMeshProUGUI messageText;
         private readonly Image messageBackground;
         private readonly GameObject messageRow;
@@ -40,6 +46,7 @@ namespace Ryuka.Sulfur.NativeUI
 
         internal SulfurSettingHandle(SulfurSettingRow row, IEnumerable<Transform> children, SulfurSettingParts parts)
         {
+            bool hasParts = parts != null;
             this.row = row ?? new SulfurSettingRow();
             this.parts = parts ?? new SulfurSettingParts();
 
@@ -52,7 +59,12 @@ namespace Ryuka.Sulfur.NativeUI
                 }
             }
 
-            statusBadgeText = FirstText(this.parts.BadgeRow) ?? FindFirstBadgeText();
+            badgeRow = this.parts.BadgeRow;
+            context = this.parts.Context;
+            statusBadge = this.parts.StatusBadge;
+
+            if (!hasParts)
+                legacyStatusText = FindFirstBadgeText();
 
             messageRow = this.parts.MessageRow;
             messageText = messageRow != null ? FirstText(messageRow) : FindMessageText();
@@ -73,12 +85,16 @@ namespace Ryuka.Sulfur.NativeUI
             SetDirty(dirty, row.DirtyText, row.CleanText);
         }
 
+        /// <summary>
+        /// Shows the row's status badge for <paramref name="dirty"/>: <paramref name="dirtyText"/>
+        /// while dirty, <paramref name="cleanText"/> while clean (none while clean when the row
+        /// has <see cref="SulfurSettingRow.ShowCleanBadge"/> false). The status badge is always
+        /// the leftmost one; it is added or removed as needed, and the row's other badges stay
+        /// as built.
+        /// </summary>
         public void SetDirty(bool dirty, string dirtyText, string cleanText)
         {
             row.IsDirty = dirty;
-
-            if (statusBadgeText == null)
-                return;
 
             // The row's built-in English defaults are shown in the player's language.
             string text = dirty ? SulfurUiText.SettingDirtyText(dirtyText) : SulfurUiText.SettingCleanText(cleanText);
@@ -86,7 +102,82 @@ namespace Ryuka.Sulfur.NativeUI
             if (string.IsNullOrWhiteSpace(text))
                 text = dirty ? SulfurUiText.DirtyBadge : SulfurUiText.CleanBadge;
 
-            statusBadgeText.text = text;
+            if (badgeRow == null)
+            {
+                // Gone (page closed or rebuilt), or a row found by name.
+                if (legacyStatusText != null)
+                    legacyStatusText.text = text;
+                return;
+            }
+
+            if (!dirty && !row.ShowCleanBadge)
+            {
+                RemoveStatusBadge();
+                return;
+            }
+
+            if (statusBadge != null)
+            {
+                TextMeshProUGUI label = statusBadge.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (label != null)
+                    label.text = text;
+                return;
+            }
+
+            AddStatusBadge(text);
+        }
+
+        private void AddStatusBadge(string text)
+        {
+            if (context == null || !context.IsAlive)
+                return;
+
+            // A badge built with the row has the row's text style (compact when indented).
+            TextMeshProUGUI sibling = FirstText(badgeRow);
+
+            Transform rowTransform = badgeRow.transform;
+            context.CreateBadge(rowTransform, text.Trim());
+
+            Transform badge = rowTransform.GetChild(rowTransform.childCount - 1);
+            badge.SetAsFirstSibling();
+            statusBadge = badge.gameObject;
+
+            TextMeshProUGUI label = badge.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (label != null)
+            {
+                if (sibling != null)
+                {
+                    label.fontSize = sibling.fontSize;
+                    label.enableAutoSizing = sibling.enableAutoSizing;
+                }
+                else if (row.IndentLevel > 0)
+                {
+                    label.enableAutoSizing = false;
+                    label.fontSize = SulfurOptionsSettingRows.CompactBadgeFontSize(label.fontSize);
+                }
+            }
+
+            ApplyBadgeRowVisibility();
+        }
+
+        private void RemoveStatusBadge()
+        {
+            if (statusBadge == null)
+                return;
+
+            // Out of the row (and its layout) now; the object goes at the end of the frame.
+            statusBadge.transform.SetParent(null, false);
+            UnityEngine.Object.Destroy(statusBadge);
+            statusBadge = null;
+
+            ApplyBadgeRowVisibility();
+        }
+
+        // A badge row without badges takes no space.
+        private void ApplyBadgeRowVisibility()
+        {
+            if (badgeRow != null)
+                badgeRow.SetActive(rowActive && badgeRow.transform.childCount > 0);
         }
 
         /// <summary>
@@ -143,6 +234,8 @@ namespace Ryuka.Sulfur.NativeUI
 
                 if (messageRow != null && go == messageRow)
                     wanted = active && messageVisible;
+                else if (badgeRow != null && go == badgeRow)
+                    wanted = active && badgeRow.transform.childCount > 0;
                 else if (defaultButtonRow != null && go == defaultButtonRow)
                     wanted = active && defaultButtonVisible;
 

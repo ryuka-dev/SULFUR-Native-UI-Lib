@@ -36,6 +36,11 @@
 - **Toggles and sliders keep saving after being hidden.** The game's
   `OptionsScreenOption.OnDisable` removes every listener from them; the library now
   re-attaches its own when the row is shown again.
+- **`SulfurSettingHandle.SetDirty` no longer overwrites another badge.** On a row built
+  without a status badge (`ShowCleanBadge = false`, not dirty) it rewrote the first other
+  badge (e.g. "Restart Required"), or did nothing when the row had no badges. It now adds
+  the status badge in front, and removes it again when the row becomes clean and
+  `ShowCleanBadge` is false (before, such a row showed the clean text).
 - **A page whose `BuildPage` throws** shows an error row instead of a blank page
   that then threw on Use/Escape; the exception is logged once with the page id. A
   category button whose page was unregistered behaves the same. One mod's failing

@@ -282,3 +282,6 @@ may notice (most importantly: after `ctx.Rebuild()` the old `ctx` is dead); see
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Changelog](CHANGELOG.md)
 - Maintainers: [docs/internal/](docs/internal/MAINTAINER_NOTES.md)
+
+The library ships `SULFUR Native UI Lib.xml` next to the DLL, so IDEs show its
+documentation comments. Licensed under the [MIT License](LICENSE).
