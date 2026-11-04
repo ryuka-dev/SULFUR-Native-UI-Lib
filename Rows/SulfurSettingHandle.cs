@@ -119,6 +119,9 @@ namespace Ryuka.Sulfur.NativeUI
                 messageVisible = !empty;
                 messageRow.SetActive(rowActive && messageVisible);
             }
+
+            // A longer or shorter message changes the line count of a wrapping message line.
+            SulfurRowHeightFitter.Refit(messageText);
         }
 
         /// <summary>

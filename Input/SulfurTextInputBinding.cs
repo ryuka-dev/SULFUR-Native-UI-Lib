@@ -35,6 +35,18 @@ namespace Ryuka.Sulfur.NativeUI
             get { return lastFocusLostFrame >= 0 && Time.frameCount - lastFocusLostFrame <= 1; }
         }
 
+        // Keyboard/gamepad start of editing with the whole text selected: onFocusSelectAll is
+        // switched on until TMP has applied it, then back to its own value (see
+        // ActivateFromNavigation).
+        private bool selectAllRestorePending;
+        private bool savedOnFocusSelectAll;
+        private int selectAllRequestFrame;
+
+        // TMP activates a field in its LateUpdate after ActivateInputField, and the order of
+        // its LateUpdate and this one is not defined: allow a few frames before giving up on
+        // an activation TMP refused (then the flag is restored all the same).
+        private const int SelectAllRestoreFrames = 3;
+
         private void LateUpdate()
         {
             bool focused = InputField != null && InputField.isFocused;
@@ -43,6 +55,64 @@ namespace Ryuka.Sulfur.NativeUI
                 lastFocusLostFrame = Time.frameCount;
 
             wasFocused = focused;
+
+            if (selectAllRestorePending && (focused || Time.frameCount - selectAllRequestFrame > SelectAllRestoreFrames))
+                RestoreOnFocusSelectAll();
+        }
+
+        private void OnDisable()
+        {
+            RestoreOnFocusSelectAll();
+        }
+
+        /// <summary>
+        /// Starts editing from the row's navigation proxy (keyboard Enter / gamepad A). With
+        /// <paramref name="selectAll"/> the whole text is selected, so typing replaces the
+        /// value (number fields); otherwise the caret goes to the end of the text (text
+        /// fields). Mouse clicks do not come here and keep TMP's own handling: the caret
+        /// lands where the field was clicked, because the library builds its fields with
+        /// onFocusSelectAll off.
+        /// </summary>
+        /// <remarks>
+        /// TMP applies the activation in its next LateUpdate (ActivateInputField only sets a
+        /// flag; ActivateInputFieldInternal then calls OnFocus, which selects all when
+        /// onFocusSelectAll is on, and otherwise leaves the caret where it was: at 0 for a
+        /// field never edited). Selecting all goes through that same OnFocus, so TMP also
+        /// sets its select-all state (the first key typed replaces the whole text). The
+        /// caret position is set before the activation, which keeps it.
+        /// </remarks>
+        public void ActivateFromNavigation(bool selectAll)
+        {
+            TMP_InputField field = InputField;
+            if (field == null)
+                return;
+
+            if (selectAll)
+            {
+                if (!selectAllRestorePending)
+                    savedOnFocusSelectAll = field.onFocusSelectAll;
+
+                field.onFocusSelectAll = true;
+                selectAllRestorePending = true;
+                selectAllRequestFrame = Time.frameCount;
+            }
+            else
+            {
+                field.stringPosition = (field.text ?? "").Length;
+            }
+
+            field.ActivateInputField();
+        }
+
+        private void RestoreOnFocusSelectAll()
+        {
+            if (!selectAllRestorePending)
+                return;
+
+            selectAllRestorePending = false;
+
+            if (InputField != null)
+                InputField.onFocusSelectAll = savedOnFocusSelectAll;
         }
 
         public void Configure(TMP_InputField input)

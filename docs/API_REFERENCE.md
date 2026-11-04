@@ -205,6 +205,15 @@ Adds description text. Returns `null` (the return type is `OptionsScreenOption`
 for binary compatibility; the row is not a native option row). The same holds
 for `AddReadonlyText`.
 
+A description that wraps (or contains line breaks) makes its row taller by the
+extra lines, keeping the single-line padding, so it never runs into the row
+below; a single-line description keeps the row's usual height. The same applies
+to message lines (`AddMessage` / `AddWarning` / `AddError` / `AddSuccess`, a
+setting row's message line, also after `SulfurSettingHandle.SetMessage`) and to
+`AddTextRow` / `SulfurTextHandle.SetText`. Message and text rows do not wrap
+outside indented setting rows (long text is cut with "…"), so there only explicit
+line breaks add lines.
+
 ### AddWarning
 
 ```csharp
@@ -219,7 +228,8 @@ Adds warning text.
 ctx.AddBadgeRow("Entries: 3", "Pending: 1");
 ```
 
-Adds a compact row of badges.
+Adds a compact row of badges. To change the badges later without a rebuild, use
+`AddBadgeRowEx` (see [AddBadgeRowEx → SulfurBadgeRowHandle](#addbadgerowex--sulfurbadgerowhandle)).
 
 ### AddSmallButton
 
@@ -312,6 +322,80 @@ buttons[0].SetLabel("Hosting…");
 
 Each handle: `SetLabel` / `SetInteractable` / `SetVisible`. A disabled button is
 greyed (background + label).
+
+### AddBadgeRowEx → SulfurBadgeRowHandle
+
+```csharp
+SulfurBadgeRowHandle AddBadgeRowEx(params string[] badges);
+SulfurBadgeRowHandle AddBadgeRowEx(IReadOnlyList<string> badges);
+
+// SulfurOptionsFoldoutExtensions: the *WithBadges foldouts, handing out their badge row
+bool AddFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, IReadOnlyList<string> badges, out SulfurBadgeRowHandle badgeRow);
+bool AddPluginFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, IReadOnlyList<string> badges, out SulfurBadgeRowHandle badgeRow);
+bool AddSectionFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, IReadOnlyList<string> badges, out SulfurBadgeRowHandle badgeRow);
+```
+
+The same badge row as `AddBadgeRow` / the existing `*FoldoutWithBadges` calls,
+returned as a handle:
+
+| Member | |
+|---|---|
+| `IsAlive` | row exists and its page is on screen |
+| `BadgeCount` | badges shown now |
+| `SetBadges(params string[])`, `SetBadges(IReadOnlyList<string>)` | replaces all badges; `false` when the row is gone |
+| `SetBadge(int index, string text)` | changes one badge's text; `false` when gone, out of range or `text` empty |
+| `SetVisible(bool)` | shows / hides the row |
+
+Badges look as `AddBadgeRow` draws them: the text as given (trimmed, empty
+entries skipped; nothing is translated), all badges in the same colours. They
+are not navigation stops, and the row keeps its built size and place. A row
+without badges is hidden (it takes no space): with no badges at build time the
+row is still created, hidden, so `SetBadges` can show it later; `SetBadges()`
+with nothing hides it again.
+
+The foldout overloads take the badges as a list or array before the `out`
+parameter (`params` must be last); existing calls keep binding to the original
+`params string[]` overloads, which still return only the expanded state.
+
+Example: a config editor shows "Pending: N" on each plugin header and updates it
+after an edit, without rebuilding the page:
+
+```csharp
+readonly Dictionary<string, SulfurBadgeRowHandle> pluginBadges = new Dictionary<string, SulfurBadgeRowHandle>();
+
+void DrawPlugin(SulfurOptionsContext ctx, PluginView plugin)
+{
+    SulfurBadgeRowHandle badges;
+    bool expanded = ctx.AddPluginFoldoutWithBadges(
+        "plugin." + plugin.Guid,
+        plugin.DisplayName,
+        false,
+        false,
+        new[] { "Entries: " + plugin.EntryCount, PendingBadge(plugin.PendingCount) },
+        out badges);
+
+    pluginBadges[plugin.Guid] = badges;
+
+    if (expanded)
+        DrawEntries(ctx, plugin);
+}
+
+// Called from an entry row's onChanged:
+void OnDraftChanged(PluginView plugin)
+{
+    SulfurBadgeRowHandle badges;
+    if (pluginBadges.TryGetValue(plugin.Guid, out badges) && badges.IsAlive)
+        badges.SetBadge(1, PendingBadge(plugin.PendingCount));   // or SetBadges(...) for all
+}
+
+static string PendingBadge(int count)
+{
+    return count > 0 ? "Pending: " + count : "Unchanged";
+}
+```
+
+Clear the dictionary at the start of each `BuildPage`: handles from an earlier
+build are not alive.
 
 ### AddList → SulfurListHandle
 
@@ -576,7 +660,9 @@ screen order, with the game's own selection highlight (the white row border):
   either); its stored open/closed state is left as the player set it.
 - In a **text input**, typing, the caret keys and Enter/Escape belong to the
   field. Enter or Escape ends editing and returns to row navigation with the same
-  row selected. A stacked input is one stop: the row with the box (its label row
+  row selected. Starting to type with Use selects the whole value of a number
+  input (the first key typed replaces it) and puts the caret at the end of a text
+  input; a mouse click still puts the caret where the field was clicked. A stacked input is one stop: the row with the box (its label row
   above is not a separate stop any more).
 - The **footer** button is always the last stop of the page.
 - Rows hidden with `SetVisible(false)`, `SetActive(false)`, a collapsed foldout

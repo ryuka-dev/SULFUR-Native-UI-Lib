@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using PerfectRandom.Sulfur.Core;
 using TMPro;
 using UnityEngine;
@@ -121,6 +122,83 @@ namespace Ryuka.Sulfur.NativeUI
                 ctx.AddBadgeRow(badges);
 
             return expanded;
+        }
+
+        /// <summary>
+        /// As <see cref="AddFoldoutWithBadges(SulfurOptionsContext, string, string, bool, bool, string[])"/>,
+        /// and hands out the badge row so its badges can be replaced in place
+        /// (<see cref="SulfurBadgeRowHandle.SetBadges(string[])"/>). With no badges the row is
+        /// still built, hidden, so the handle can show badges later.
+        /// </summary>
+        public static bool AddFoldoutWithBadges(
+            this SulfurOptionsContext ctx,
+            string key,
+            string label,
+            bool defaultExpanded,
+            bool forceExpanded,
+            IReadOnlyList<string> badges,
+            out SulfurBadgeRowHandle badgeRow)
+        {
+            return AddPluginFoldoutWithBadges(ctx, key, label, defaultExpanded, forceExpanded, badges, out badgeRow);
+        }
+
+        /// <summary>
+        /// As <see cref="AddPluginFoldoutWithBadges(SulfurOptionsContext, string, string, bool, bool, string[])"/>,
+        /// and hands out the badge row (see the <c>AddFoldoutWithBadges</c> overload with
+        /// <c>out SulfurBadgeRowHandle</c>).
+        /// </summary>
+        public static bool AddPluginFoldoutWithBadges(
+            this SulfurOptionsContext ctx,
+            string key,
+            string label,
+            bool defaultExpanded,
+            bool forceExpanded,
+            IReadOnlyList<string> badges,
+            out SulfurBadgeRowHandle badgeRow)
+        {
+            bool expanded = AddStyledFoldout(
+                ctx,
+                key,
+                label,
+                defaultExpanded,
+                forceExpanded,
+                null,
+                SulfurFoldoutStyle.Plugin);
+
+            badgeRow = AddFoldoutBadgeRow(ctx, badges);
+            return expanded;
+        }
+
+        /// <summary>
+        /// As <see cref="AddSectionFoldoutWithBadges(SulfurOptionsContext, string, string, bool, bool, string[])"/>,
+        /// and hands out the badge row (see the <c>AddFoldoutWithBadges</c> overload with
+        /// <c>out SulfurBadgeRowHandle</c>).
+        /// </summary>
+        public static bool AddSectionFoldoutWithBadges(
+            this SulfurOptionsContext ctx,
+            string key,
+            string label,
+            bool defaultExpanded,
+            bool forceExpanded,
+            IReadOnlyList<string> badges,
+            out SulfurBadgeRowHandle badgeRow)
+        {
+            bool expanded = AddStyledFoldout(
+                ctx,
+                key,
+                label,
+                defaultExpanded,
+                forceExpanded,
+                null,
+                SulfurFoldoutStyle.Section);
+
+            badgeRow = AddFoldoutBadgeRow(ctx, badges);
+            return expanded;
+        }
+
+        private static SulfurBadgeRowHandle AddFoldoutBadgeRow(SulfurOptionsContext ctx, IReadOnlyList<string> badges)
+        {
+            return ctx != null ? ctx.AddBadgeRowEx(badges) : new SulfurBadgeRowHandle(null, null);
         }
 
         private static bool AddStyledFoldout(

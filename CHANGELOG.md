@@ -51,6 +51,13 @@
   `SulfurListHandle.Update`). Before, pressing the 2nd button of a row whose
   callback rebuilt the page moved the focus back to the 1st button, so the next
   Enter pressed the wrong one.
+- **Long descriptions and messages no longer cover the next row.** Description,
+  message and text rows had a fixed height while their text wrapped; they now grow
+  with the text (single-line rows keep their exact height).
+- **Starting to edit with keyboard/gamepad** selects a number input's whole value
+  (typing replaces it; before, "0.13" typed into "0.25" gave "0.250.13") and puts a
+  text input's caret at the end. Mouse clicks are unchanged. Text selections are now
+  drawn.
 - **Setting rows always have a message line** (hidden while empty), so
   `SulfurSettingHandle.SetMessage` works on rows built without a message.
 - **Forced-open foldouts ignore clicks.** With `forceExpanded`, a click used to
@@ -99,6 +106,9 @@
   (bool / float / double / string), `SetIndexWithoutNotify` (cycle) and
   `SetDefaultButtonVisible`, so e.g. a Default button no longer needs a page
   rebuild. Calls on a row of another kind return false.
+- **Badge rows that update in place:** `AddBadgeRowEx(...)` and `out
+  SulfurBadgeRowHandle` overloads of the three `*FoldoutWithBadges` methods;
+  the handle has `SetBadges`, `SetBadge(index, text)`, `SetVisible`, `IsAlive`.
 - **Double-precision number inputs:** `AddNumberInput`, `AddInlineNumberInput`,
   `AddSettingNumber` and `AddSettingNumberEx` overloads taking `double`. The float
   versions keep their ~7 significant digits (documented); existing calls still bind

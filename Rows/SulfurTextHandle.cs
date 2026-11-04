@@ -23,7 +23,12 @@ namespace Ryuka.Sulfur.NativeUI
         public void SetText(string text)
         {
             if (label != null)
+            {
                 label.text = text ?? "";
+
+                // The row grows with explicit line breaks and shrinks back without them.
+                SulfurRowHeightFitter.Refit(label);
+            }
         }
 
         public void SetColor(Color color)

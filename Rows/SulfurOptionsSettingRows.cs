@@ -553,16 +553,25 @@ namespace Ryuka.Sulfur.NativeUI
 
             LayoutElement layout = child.GetComponent<LayoutElement>();
 
+            // Description and message rows wrap in this style: their height follows the line
+            // count from the compact single-line height (the fitter re-measures with the new
+            // font size and the indented width).
             if (isBadge)
                 SetRowHeight(rt, layout, 28f);
             else if (isMessage)
-                SetRowHeight(rt, layout, 38f);
+                SetWrappingRowHeight(child.gameObject, rt, layout, 38f);
             else if (isDescription)
-                SetRowHeight(rt, layout, 34f);
+                SetWrappingRowHeight(child.gameObject, rt, layout, 34f);
             else if (isSmallButton)
                 SetRowHeight(rt, layout, 36f);
             else if (isOption)
                 SetRowHeight(rt, layout, 50f);
+        }
+
+        private static void SetWrappingRowHeight(GameObject row, RectTransform rt, LayoutElement layout, float height)
+        {
+            SetRowHeight(rt, layout, height);
+            SulfurRowHeightFitter.SetBaseHeight(row, height);
         }
 
         private static void SetRowHeight(RectTransform rt, LayoutElement layout, float height)

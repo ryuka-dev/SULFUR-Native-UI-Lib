@@ -1295,6 +1295,9 @@ namespace Ryuka.Sulfur.NativeUI
                 label.color = new Color(1f, 1f, 1f, 0.58f);
             }
 
+            // A description that wraps grows the row instead of running into the row below.
+            SulfurRowHeightFitter.Attach(row, label, 42f);
+
             return row;
         }
 
@@ -1347,6 +1350,9 @@ namespace Ryuka.Sulfur.NativeUI
                 label.fontSize = 16f;
                 label.color = Color.white;
             }
+
+            // The row does not wrap; explicit line breaks (also from SetText) grow it.
+            SulfurRowHeightFitter.Attach(row, label, 42f);
 
             return new SulfurTextHandle(row, label);
         }
@@ -1426,6 +1432,10 @@ namespace Ryuka.Sulfur.NativeUI
                 label.color = new Color(1f, 1f, 1f, 0.9f);
             }
 
+            // Explicit line breaks grow the row; so does wrapping where a setting row turns it
+            // on (compact style) and a later SetMessage. Attached while the row is active.
+            SulfurRowHeightFitter.Attach(row, label, 40f);
+
             if (empty)
                 row.SetActive(false);
 
@@ -1452,10 +1462,40 @@ namespace Ryuka.Sulfur.NativeUI
             AddBadgeRowObject(badges);
         }
 
+        /// <summary>
+        /// Adds a badge row like <see cref="AddBadgeRow(string[])"/> and returns a live handle
+        /// that replaces the badges in place (<see cref="SulfurBadgeRowHandle.SetBadges(string[])"/>),
+        /// without rebuilding the page. Empty and whitespace badges are skipped. With no badge
+        /// left the row is still built, hidden (it takes no space), so the handle can show
+        /// badges later.
+        /// </summary>
+        public SulfurBadgeRowHandle AddBadgeRowEx(params string[] badges)
+        {
+            return AddBadgeRowEx((IReadOnlyList<string>)badges);
+        }
+
+        /// <summary>As <see cref="AddBadgeRowEx(string[])"/>.</summary>
+        public SulfurBadgeRowHandle AddBadgeRowEx(IReadOnlyList<string> badges)
+        {
+            if (!EnsureAlive("AddBadgeRowEx"))
+                return new SulfurBadgeRowHandle(null, null);
+
+            GameObject row = AddBadgeRowObject(SulfurBadgeRowHandle.CleanBadges(badges), true);
+            return new SulfurBadgeRowHandle(this, row);
+        }
+
         // The badge row itself (null when nothing was added), for setting-row handles.
         internal GameObject AddBadgeRowObject(IReadOnlyList<string> badges)
         {
-            if (badges == null || badges.Count == 0 || !EnsureAlive("AddBadgeRow"))
+            return AddBadgeRowObject(badges, false);
+        }
+
+        // With createWhenEmpty an empty list still builds the row, inactive (layout groups
+        // skip it), for a badge-row handle that shows badges later.
+        internal GameObject AddBadgeRowObject(IReadOnlyList<string> badges, bool createWhenEmpty)
+        {
+            bool empty = badges == null || badges.Count == 0;
+            if ((empty && !createWhenEmpty) || !EnsureAlive("AddBadgeRow"))
                 return null;
 
             GameObject row = new GameObject("SULFUR_BadgeRow", typeof(RectTransform), typeof(LayoutElement), typeof(HorizontalLayoutGroup));
@@ -1479,11 +1519,17 @@ namespace Ryuka.Sulfur.NativeUI
             group.childForceExpandWidth = false;
             group.childForceExpandHeight = true;
 
-            foreach (string badge in badges)
+            if (!empty)
             {
-                if (!string.IsNullOrWhiteSpace(badge))
-                    CreateBadge(row.transform, badge.Trim());
+                foreach (string badge in badges)
+                {
+                    if (!string.IsNullOrWhiteSpace(badge))
+                        CreateBadge(row.transform, badge.Trim());
+                }
             }
+
+            if (empty)
+                row.SetActive(false);
 
             return row;
         }
@@ -1787,7 +1833,7 @@ namespace Ryuka.Sulfur.NativeUI
                     onChanged(text);
             }));
 
-            RegisterInputNavigation(field, field.GetComponent<RectTransform>());
+            RegisterInputNavigation(field, field.GetComponent<RectTransform>(), false);
 
             input = field;
             return labelOption;
@@ -1888,7 +1934,7 @@ namespace Ryuka.Sulfur.NativeUI
                 ? SulfurNumberInput.AttachDouble(input, value, min, max, decimals, onDoubleChanged)
                 : SulfurNumberInput.AttachFloat(input, (float)value, (float)min, (float)max, decimals, onFloatChanged);
 
-            RegisterInputNavigation(input, input.GetComponent<RectTransform>());
+            RegisterInputNavigation(input, input.GetComponent<RectTransform>(), true);
 
             return labelOption;
         }
@@ -1930,7 +1976,7 @@ namespace Ryuka.Sulfur.NativeUI
                     onChanged(text);
             }));
 
-            RegisterInputNavigation(input, input.transform.parent as RectTransform);
+            RegisterInputNavigation(input, input.transform.parent as RectTransform, false);
 
             return input;
         }
@@ -2001,7 +2047,7 @@ namespace Ryuka.Sulfur.NativeUI
             else
                 SulfurNumberInput.AttachFloat(input, (float)value, (float)min, (float)max, decimals, onFloatChanged);
 
-            RegisterInputNavigation(input, input.transform.parent as RectTransform);
+            RegisterInputNavigation(input, input.transform.parent as RectTransform, true);
 
             return input;
         }
@@ -2084,8 +2130,10 @@ namespace Ryuka.Sulfur.NativeUI
 
         // Use on the row starts typing in input. Leaving the field (Enter, Escape, a click
         // elsewhere) returns to row navigation with this row still selected: the selection
-        // never moved, only the EventSystem focus did.
-        private void RegisterInputNavigation(TMP_InputField input, RectTransform host)
+        // never moved, only the EventSystem focus did. selectAllOnUse: a number field starts
+        // with its text selected, so typing replaces the value; a text field starts with the
+        // caret at the end. Mouse clicks are not affected (see SulfurTextInputBinding).
+        private void RegisterInputNavigation(TMP_InputField input, RectTransform host, bool selectAllOnUse)
         {
             if (input == null || host == null)
                 return;
@@ -2101,7 +2149,10 @@ namespace Ryuka.Sulfur.NativeUI
                 if (inputBinding != null && inputBinding.LeftFocusRecently)
                     return;
 
-                input.ActivateInputField();
+                if (inputBinding != null)
+                    inputBinding.ActivateFromNavigation(selectAllOnUse);
+                else
+                    input.ActivateInputField();
             });
         }
 
@@ -2275,11 +2326,12 @@ namespace Ryuka.Sulfur.NativeUI
         }
 
 
-        private void CreateBadge(Transform parent, string text)
+        // One badge of a badge row (also used by SulfurBadgeRowHandle to rebuild a row).
+        internal void CreateBadge(Transform parent, string text)
         {
             TextMeshProUGUI sample = FindSampleText();
 
-            GameObject badge = new GameObject("Badge_" + text, typeof(RectTransform), typeof(LayoutElement), typeof(CanvasRenderer), typeof(Image));
+            GameObject badge = new GameObject(BadgeObjectPrefix + text, typeof(RectTransform), typeof(LayoutElement), typeof(CanvasRenderer), typeof(Image));
             badge.transform.SetParent(parent, false);
 
             Image bg = badge.GetComponent<Image>();
@@ -2287,7 +2339,7 @@ namespace Ryuka.Sulfur.NativeUI
             bg.raycastTarget = false;
 
             LayoutElement layout = badge.GetComponent<LayoutElement>();
-            layout.minWidth = Mathf.Clamp(text.Length * 9f + 26f, 70f, 220f);
+            layout.minWidth = GetBadgeWidth(text);
             layout.preferredWidth = layout.minWidth;
             layout.minHeight = 26f;
             layout.preferredHeight = 26f;
@@ -2319,6 +2371,14 @@ namespace Ryuka.Sulfur.NativeUI
                 label.fontSize = 14f;
                 label.color = new Color(1f, 1f, 1f, 0.82f);
             }
+        }
+
+        internal const string BadgeObjectPrefix = "Badge_";
+
+        // The LayoutElement width CreateBadge gives a badge with this text.
+        internal static float GetBadgeWidth(string text)
+        {
+            return Mathf.Clamp((text ?? "").Length * 9f + 26f, 70f, 220f);
         }
 
         private UIButton CreateSmallButton(Transform parent, string label, Action onPressed)
