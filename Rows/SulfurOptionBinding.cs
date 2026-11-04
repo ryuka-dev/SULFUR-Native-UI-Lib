@@ -195,6 +195,19 @@ namespace Ryuka.Sulfur.NativeUI
             return Mathf.Clamp(snapped, min, max);
         }
 
+        /// <summary>
+        /// Sets the bound checkbox without reporting the change; works while locked. False
+        /// when no checkbox is bound (or it is gone).
+        /// </summary>
+        public bool SetToggleValueWithoutNotify(bool value)
+        {
+            if (boundToggle == null)
+                return false;
+
+            boundToggle.SetIsOnWithoutNotify(value);
+            return true;
+        }
+
         /// <summary>Moves the bound slider without reporting the change (also not later, as a drag delta).</summary>
         public void SetSliderValueWithoutNotify(float value)
         {

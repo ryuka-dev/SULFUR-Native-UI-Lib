@@ -47,6 +47,15 @@
   is a library input or inside the options screen.
 - **Glyph fallback** no longer retries every OS font on every row when none can be
   loaded (e.g. under Proton): at most 5 attempts, 30 s apart, one warning.
+- **Button rows keep their in-row focus across `ctx.Rebuild()`** (and across
+  `SulfurListHandle.Update`). Before, pressing the 2nd button of a row whose
+  callback rebuilt the page moved the focus back to the 1st button, so the next
+  Enter pressed the wrong one.
+- **Setting rows always have a message line** (hidden while empty), so
+  `SulfurSettingHandle.SetMessage` works on rows built without a message.
+- **Forced-open foldouts ignore clicks.** With `forceExpanded`, a click used to
+  flip the stored state invisibly, so the foldout came back inverted once the force
+  was lifted.
 - **Workaround for a game bug: no more NullReferenceException spam when moving the
   mouse over Options rows at the main menu** (the game's
   `OptionsScreenOption.OnPointerEnter/Exit` read `GameManager.Instance`, which does
@@ -86,6 +95,14 @@
   buttons, text and number inputs (Enter starts typing, Escape stops), and the
   footer button. They get the game's own selection border; mouse behaviour is
   unchanged.
+- **`SulfurSettingHandle` can set the row's value in place:** `SetValueWithoutNotify`
+  (bool / float / double / string), `SetIndexWithoutNotify` (cycle) and
+  `SetDefaultButtonVisible`, so e.g. a Default button no longer needs a page
+  rebuild. Calls on a row of another kind return false.
+- **Double-precision number inputs:** `AddNumberInput`, `AddInlineNumberInput`,
+  `AddSettingNumber` and `AddSettingNumberEx` overloads taking `double`. The float
+  versions keep their ~7 significant digits (documented); existing calls still bind
+  to them.
 - **`SulfurOptionsContext.IsAlive`.** A context stops being alive when its page is
   rebuilt, another page is shown or the screen closes; calls on a dead context are
   ignored instead of writing into whatever page is on screen now.

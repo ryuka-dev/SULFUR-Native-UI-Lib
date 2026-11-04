@@ -115,7 +115,17 @@ namespace Ryuka.Sulfur.NativeUI
             if (!IsAlive || !optionsScreen.IsShown)
                 return;
 
-            SulfurOptionsScreenBridge.RebuildCurrentCustomPage(optionsScreen);
+            // The rebuild keeps the selected row by its index in the navigation list; button
+            // rows keep their in-row focus by the same index (see SulfurButtonRowNavigator).
+            SulfurButtonRowNavigator.FocusCarry previous = BeginButtonFocusCarry();
+            try
+            {
+                SulfurOptionsScreenBridge.RebuildCurrentCustomPage(optionsScreen);
+            }
+            finally
+            {
+                SulfurButtonRowNavigator.EndFocusCarry(previous);
+            }
         }
 
         public void SetFooter(
@@ -429,6 +439,27 @@ namespace Ryuka.Sulfur.NativeUI
             return option;
         }
 
+        // AddToggle with a description that also hands out the checkbox and its binding
+        // (setting-row handles set the value later).
+        internal OptionsScreenOption AddToggleCore(
+            string label,
+            string description,
+            bool value,
+            Action<bool> onChanged,
+            out UIToggle toggle,
+            out SulfurOptionBinding binding)
+        {
+            toggle = null;
+            binding = null;
+
+            if (!EnsureAlive("AddToggle"))
+                return null;
+
+            OptionsScreenOption option = BuildToggleOption(label, value, onChanged, out toggle, out binding);
+            AddDescription(description);
+            return option;
+        }
+
         /// <summary>
         /// Adds a native checkbox row, like <see cref="AddToggle(string, bool, Action{bool})"/>,
         /// and returns a live handle: read the value, set it without raising
@@ -582,6 +613,26 @@ namespace Ryuka.Sulfur.NativeUI
             Action<int, string> onChanged)
         {
             OptionsScreenOption option = AddCycle(label, values, currentIndex, onChanged);
+            AddDescription(description);
+            return option;
+        }
+
+        // AddCycle with a description that also hands out the row's binding (setting-row
+        // handles set the index later).
+        internal OptionsScreenOption AddCycleCore(
+            string label,
+            string description,
+            IReadOnlyList<string> values,
+            int currentIndex,
+            Action<int, string> onChanged,
+            out SulfurOptionBinding binding)
+        {
+            binding = null;
+
+            if (!EnsureAlive("AddCycle"))
+                return null;
+
+            OptionsScreenOption option = BuildCycleOption(label, values, currentIndex, onChanged, out binding);
             AddDescription(description);
             return option;
         }
@@ -1100,31 +1151,6 @@ namespace Ryuka.Sulfur.NativeUI
             return nativeOptionWidthCache;
         }
 
-        private static bool TryParseNumber(string text, out float value)
-        {
-            value = 0f;
-
-            if (string.IsNullOrWhiteSpace(text))
-                return false;
-
-            string normalized = text.Trim().Replace(',', '.');
-
-            return float.TryParse(
-                normalized,
-                System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out value);
-        }
-
-        private static float RoundNumber(float value, int decimals)
-        {
-            if (decimals <= 0)
-                return Mathf.Round(value);
-
-            float scale = Mathf.Pow(10f, decimals);
-            return Mathf.Round(value * scale) / scale;
-        }
-
         public void AddSection(string label)
         {
             if (string.IsNullOrWhiteSpace(label) || !EnsureAlive("AddSection"))
@@ -1343,8 +1369,17 @@ namespace Ryuka.Sulfur.NativeUI
 
         public void AddMessage(string text, SulfurMessageKind kind)
         {
-            if (string.IsNullOrWhiteSpace(text) || !EnsureAlive("AddMessage"))
-                return;
+            AddMessageRow(text, kind, false);
+        }
+
+        // The message row itself. With createWhenEmpty an empty text still builds the row,
+        // inactive (layout groups skip it, it has no navigation stop), so a setting-row
+        // handle can show a message later; otherwise an empty text adds nothing (null).
+        internal GameObject AddMessageRow(string text, SulfurMessageKind kind, bool createWhenEmpty)
+        {
+            bool empty = string.IsNullOrWhiteSpace(text);
+            if ((empty && !createWhenEmpty) || !EnsureAlive("AddMessage"))
+                return null;
 
             GameObject row = new GameObject("SULFUR_Message_" + kind, typeof(RectTransform), typeof(LayoutElement), typeof(CanvasRenderer), typeof(Image));
             row.transform.SetParent(OptionsContainer, false);
@@ -1373,7 +1408,7 @@ namespace Ryuka.Sulfur.NativeUI
 
             TextMeshProUGUI sample = FindSampleText();
             TextMeshProUGUI label = textObject.GetComponent<TextMeshProUGUI>();
-            label.text = GetMessagePrefix(kind) + text;
+            label.text = empty ? "" : GetMessagePrefix(kind) + text;
             label.alignment = TextAlignmentOptions.MidlineLeft;
             label.raycastTarget = false;
             label.textWrappingMode = TextWrappingModes.NoWrap;
@@ -1390,6 +1425,11 @@ namespace Ryuka.Sulfur.NativeUI
                 label.fontSize = 17f;
                 label.color = new Color(1f, 1f, 1f, 0.9f);
             }
+
+            if (empty)
+                row.SetActive(false);
+
+            return row;
         }
 
         public void AddBadgeRow(params string[] badges)
@@ -1409,8 +1449,14 @@ namespace Ryuka.Sulfur.NativeUI
 
         public void AddBadgeRow(IReadOnlyList<string> badges)
         {
+            AddBadgeRowObject(badges);
+        }
+
+        // The badge row itself (null when nothing was added), for setting-row handles.
+        internal GameObject AddBadgeRowObject(IReadOnlyList<string> badges)
+        {
             if (badges == null || badges.Count == 0 || !EnsureAlive("AddBadgeRow"))
-                return;
+                return null;
 
             GameObject row = new GameObject("SULFUR_BadgeRow", typeof(RectTransform), typeof(LayoutElement), typeof(HorizontalLayoutGroup));
             row.transform.SetParent(OptionsContainer, false);
@@ -1438,6 +1484,8 @@ namespace Ryuka.Sulfur.NativeUI
                 if (!string.IsNullOrWhiteSpace(badge))
                     CreateBadge(row.transform, badge.Trim());
             }
+
+            return row;
         }
 
         public void AddDefaultButton(Action onPressed)
@@ -1452,8 +1500,15 @@ namespace Ryuka.Sulfur.NativeUI
 
         public void AddSmallButton(string label, Action onPressed, float minWidth)
         {
+            AddSmallButtonRow(label, onPressed, minWidth);
+        }
+
+        // The small-button row itself (null when nothing was added), for setting-row
+        // handles that show/hide their Default button.
+        internal GameObject AddSmallButtonRow(string label, Action onPressed, float minWidth)
+        {
             if (!EnsureAlive("AddSmallButton"))
-                return;
+                return null;
 
             string safeLabel = string.IsNullOrWhiteSpace(label) ? SulfurUiText.DefaultButton : label;
             float buttonWidth = minWidth > 0f ? minWidth : CalculateSmallButtonWidth(safeLabel);
@@ -1491,6 +1546,8 @@ namespace Ryuka.Sulfur.NativeUI
             {
                 SulfurNavigationProxy.Press(button);
             });
+
+            return row;
         }
 
         // Applies an explicit pixel width to a small button. The button rows use
@@ -1596,6 +1653,7 @@ namespace Ryuka.Sulfur.NativeUI
                 SulfurOptionBinding proxyBinding = proxy.GetComponent<SulfurOptionBinding>();
                 SulfurButtonRowNavigator navigator = proxy.gameObject.AddComponent<SulfurButtonRowNavigator>();
                 navigator.Configure(proxyBinding, rowButtons);
+                navigator.RestoreCarriedFocus(pageId, nativeOptions.IndexOf(proxy));
 
                 if (proxyBinding != null)
                 {
@@ -1695,6 +1753,20 @@ namespace Ryuka.Sulfur.NativeUI
             string value,
             Action<string> onChanged)
         {
+            TMP_InputField input;
+            return AddTextInputCore(label, description, value, onChanged, out input);
+        }
+
+        // AddTextInput that also hands out the field (setting-row handles set it later).
+        internal OptionsScreenOption AddTextInputCore(
+            string label,
+            string description,
+            string value,
+            Action<string> onChanged,
+            out TMP_InputField input)
+        {
+            input = null;
+
             if (!EnsureAlive("AddTextInput"))
                 return null;
 
@@ -1702,24 +1774,30 @@ namespace Ryuka.Sulfur.NativeUI
             OptionsScreenOption labelOption = AddInfoRow(label, false);
             AddDescription(description);
 
-            TMP_InputField input = CreateStandaloneInputField(
+            TMP_InputField field = CreateStandaloneInputField(
                 "TextInput_" + label,
                 value ?? "",
                 SulfurUiText.TextInputPlaceholder,
                 TMP_InputField.ContentType.Standard);
 
-            input.onValueChanged.RemoveAllListeners();
-            input.onValueChanged.AddListener(new UnityAction<string>(delegate (string text)
+            field.onValueChanged.RemoveAllListeners();
+            field.onValueChanged.AddListener(new UnityAction<string>(delegate (string text)
             {
                 if (onChanged != null)
                     onChanged(text);
             }));
 
-            RegisterInputNavigation(input, input.GetComponent<RectTransform>());
+            RegisterInputNavigation(field, field.GetComponent<RectTransform>());
 
+            input = field;
             return labelOption;
         }
 
+        /// <summary>
+        /// Adds a stacked number input (label row above an input box) for a float value.
+        /// Float holds about 7 significant digits: larger or more precise values are shown
+        /// and reported rounded. Use the double overload for those.
+        /// </summary>
         public OptionsScreenOption AddNumberInput(
             string label,
             float value,
@@ -1731,6 +1809,7 @@ namespace Ryuka.Sulfur.NativeUI
             return AddNumberInput(label, null, value, min, max, decimals, onChanged);
         }
 
+        /// <summary>As <see cref="AddNumberInput(string, float, float, float, int, Action{float})"/>, with a description row below the label.</summary>
         public OptionsScreenOption AddNumberInput(
     string label,
     string description,
@@ -1740,6 +1819,56 @@ namespace Ryuka.Sulfur.NativeUI
     int decimals,
     Action<float> onChanged)
         {
+            SulfurNumberInput model;
+            return AddNumberInputCore(label, description, value, min, max, decimals, onChanged, null, false, out model);
+        }
+
+        /// <summary>
+        /// Adds a stacked number input for a double value: parsed, clamped, rounded and
+        /// formatted in double with the invariant culture, so values up to 15 significant
+        /// digits are shown and reported exactly. Otherwise the same as the float overload.
+        /// </summary>
+        public OptionsScreenOption AddNumberInput(
+            string label,
+            double value,
+            double min,
+            double max,
+            int decimals,
+            Action<double> onChanged)
+        {
+            return AddNumberInput(label, null, value, min, max, decimals, onChanged);
+        }
+
+        /// <summary>As <see cref="AddNumberInput(string, double, double, double, int, Action{double})"/>, with a description row below the label.</summary>
+        public OptionsScreenOption AddNumberInput(
+            string label,
+            string description,
+            double value,
+            double min,
+            double max,
+            int decimals,
+            Action<double> onChanged)
+        {
+            SulfurNumberInput model;
+            return AddNumberInputCore(label, description, value, min, max, decimals, null, onChanged, true, out model);
+        }
+
+        // Stacked number input of either precision; hands out the value model (setting-row
+        // handles set the value later). Exactly one of the callbacks is used.
+        internal OptionsScreenOption AddNumberInputCore(
+            string label,
+            string description,
+            double value,
+            double min,
+            double max,
+            int decimals,
+            Action<float> onFloatChanged,
+            Action<double> onDoubleChanged,
+            bool useDouble,
+            out SulfurNumberInput model)
+        {
+            model = null;
+
             if (!EnsureAlive("AddNumberInput"))
                 return null;
 
@@ -1749,33 +1878,15 @@ namespace Ryuka.Sulfur.NativeUI
 
             TMP_InputField input = CreateStandaloneInputField(
                 "NumberInput_" + label,
-                FormatNumber(value, decimals),
+                useDouble ? SulfurNumberInput.FormatDouble(value, decimals) : SulfurNumberInput.FormatFloat((float)value, decimals),
                 SulfurUiText.NumberInputPlaceholder,
                 TMP_InputField.ContentType.DecimalNumber);
 
             // Unparseable input reverts to the last value this field accepted, not to the
             // value the page was built with.
-            float lastAccepted = value;
-
-            input.onEndEdit.RemoveAllListeners();
-            input.onEndEdit.AddListener(new UnityAction<string>(delegate (string text)
-            {
-                float parsed;
-                if (!TryParseNumber(text, out parsed))
-                {
-                    input.SetTextWithoutNotify(FormatNumber(lastAccepted, decimals));
-                    return;
-                }
-
-                parsed = Mathf.Clamp(parsed, min, max);
-                parsed = RoundNumber(parsed, decimals);
-                lastAccepted = parsed;
-
-                input.SetTextWithoutNotify(FormatNumber(parsed, decimals));
-
-                if (onChanged != null)
-                    onChanged(parsed);
-            }));
+            model = useDouble
+                ? SulfurNumberInput.AttachDouble(input, value, min, max, decimals, onDoubleChanged)
+                : SulfurNumberInput.AttachFloat(input, (float)value, (float)min, (float)max, decimals, onFloatChanged);
 
             RegisterInputNavigation(input, input.GetComponent<RectTransform>());
 
@@ -1824,6 +1935,15 @@ namespace Ryuka.Sulfur.NativeUI
             return input;
         }
 
+        /// <summary>
+        /// Adds an inline number input (label and box on one line) for a float value. Float
+        /// holds about 7 significant digits; use the double overload for larger or more
+        /// precise values.
+        /// </summary>
+        /// <remarks>
+        /// The returned field's text can be set by the caller, but the value unparseable input
+        /// reverts to is the last value the field accepted itself.
+        /// </remarks>
         public TMP_InputField AddInlineNumberInput(
             string label,
             float value,
@@ -1833,40 +1953,53 @@ namespace Ryuka.Sulfur.NativeUI
             Action<float> onChanged,
             float labelWidth = 160f)
         {
+            return AddInlineNumberInputCore(label, value, min, max, decimals, onChanged, null, false, labelWidth);
+        }
+
+        /// <summary>
+        /// Adds an inline number input for a double value (parsed, rounded and formatted in
+        /// double, invariant culture; exact up to 15 significant digits).
+        /// </summary>
+        public TMP_InputField AddInlineNumberInput(
+            string label,
+            double value,
+            double min,
+            double max,
+            int decimals,
+            Action<double> onChanged,
+            float labelWidth = 160f)
+        {
+            return AddInlineNumberInputCore(label, value, min, max, decimals, null, onChanged, true, labelWidth);
+        }
+
+        private TMP_InputField AddInlineNumberInputCore(
+            string label,
+            double value,
+            double min,
+            double max,
+            int decimals,
+            Action<float> onFloatChanged,
+            Action<double> onDoubleChanged,
+            bool useDouble,
+            float labelWidth)
+        {
             if (!EnsureAlive("AddInlineNumberInput"))
                 return null;
 
             TMP_InputField input = BuildInlineInputRow(
                 "SULFUR_InlineNumber_" + (label ?? ""),
                 label,
-                FormatNumber(value, decimals),
+                useDouble ? SulfurNumberInput.FormatDouble(value, decimals) : SulfurNumberInput.FormatFloat((float)value, decimals),
                 SulfurUiText.NumberInputPlaceholder,
                 TMP_InputField.ContentType.DecimalNumber,
                 labelWidth);
 
             // Unparseable input reverts to the last value this field accepted, not to the
             // value the page was built with.
-            float lastAccepted = value;
-
-            input.onEndEdit.RemoveAllListeners();
-            input.onEndEdit.AddListener(new UnityAction<string>(delegate (string text)
-            {
-                float parsed;
-                if (!TryParseNumber(text, out parsed))
-                {
-                    input.SetTextWithoutNotify(FormatNumber(lastAccepted, decimals));
-                    return;
-                }
-
-                parsed = Mathf.Clamp(parsed, min, max);
-                parsed = RoundNumber(parsed, decimals);
-                lastAccepted = parsed;
-
-                input.SetTextWithoutNotify(FormatNumber(parsed, decimals));
-
-                if (onChanged != null)
-                    onChanged(parsed);
-            }));
+            if (useDouble)
+                SulfurNumberInput.AttachDouble(input, value, min, max, decimals, onDoubleChanged);
+            else
+                SulfurNumberInput.AttachFloat(input, (float)value, (float)min, (float)max, decimals, onFloatChanged);
 
             RegisterInputNavigation(input, input.transform.parent as RectTransform);
 
@@ -1997,6 +2130,13 @@ namespace Ryuka.Sulfur.NativeUI
         internal void ReconcileSelectedOption(int previousSelectedIndex)
         {
             SulfurOptionsScreenBridge.ReconcileOptionSelection(optionsScreen, nativeOptions, previousSelectedIndex);
+        }
+
+        // Button-row focus around a rebuild of this page or of one of its lists; pass the
+        // result to SulfurButtonRowNavigator.EndFocusCarry when the rebuild returns.
+        internal SulfurButtonRowNavigator.FocusCarry BeginButtonFocusCarry()
+        {
+            return SulfurButtonRowNavigator.BeginFocusCarry(pageId, nativeOptions);
         }
 
         private readonly List<int> insertPathBuffer = new List<int>();
@@ -2286,14 +2426,6 @@ namespace Ryuka.Sulfur.NativeUI
                 text.text = value.ToString("0.###", CultureInfo.InvariantCulture);
         }
 
-        private static string FormatNumber(float value, int decimals)
-        {
-            if (decimals <= 0)
-                return Mathf.RoundToInt(value).ToString(CultureInfo.InvariantCulture);
-
-            string format = "0." + new string('#', decimals);
-            return value.ToString(format, CultureInfo.InvariantCulture);
-        }
     }
 
     // Describes a single button inside an AddButtonRow group.

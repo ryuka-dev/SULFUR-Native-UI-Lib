@@ -126,7 +126,9 @@ ctx.Rebuild();
 Rebuilds the whole current custom page. Does nothing when the context is no
 longer alive or the options screen is not shown. The scroll position and the
 input mode are kept: a keyboard/gamepad user keeps the selected row, a mouse
-user gets no row selection.
+user gets no row selection. Button rows (`AddButtonRow`) keep the button that
+had keyboard/gamepad focus inside the row (see
+[Keyboard and gamepad navigation](#keyboard-and-gamepad-navigation)).
 
 Do not use this for ordinary value changes. It is expensive.
 
@@ -426,6 +428,42 @@ ctx.AddNumberInput("Port", port, 0f, 65535f, 0, value => port = value);
 The label is placed on its own row above a full-width input box. This is the
 original layout and is unchanged.
 
+### Number precision: float and double
+
+The original number inputs (`AddNumberInput`, `AddInlineNumberInput`,
+`AddSettingNumber`, `AddSettingNumberEx` with `float` arguments) parse, clamp,
+round and format in `float`. A float holds about 7 significant digits, so
+larger or more precise values (`123456789`, `0.123456789`, a `double` config
+value) are shown and reported rounded, and a double setting cannot be edited
+exactly. Their behaviour is unchanged.
+
+For those values use the `double` overloads (since 0.11.0). They parse with
+`double` and the invariant culture (a `,` typed as decimal separator is read as
+`.`), clamp to `[min, max]`, round to `decimals` (ties to even, like the float
+version; at most 15 decimals) and format without a thousands separator. The
+text shows up to 15 significant digits, which a double holds exactly:
+
+```csharp
+OptionsScreenOption AddNumberInput(string label, double value, double min, double max, int decimals, Action<double> onChanged);
+OptionsScreenOption AddNumberInput(string label, string description, double value, double min, double max, int decimals, Action<double> onChanged);
+TMP_InputField AddInlineNumberInput(string label, double value, double min, double max, int decimals, Action<double> onChanged, float labelWidth = 160f);
+
+// SulfurOptionsSettingRows
+OptionsScreenOption AddSettingNumber(this SulfurOptionsContext ctx, SulfurSettingRow row, double value, double min, double max, int decimals, Action<double> onChanged);
+OptionsScreenOption AddSettingNumberEx(this SulfurOptionsContext ctx, SulfurSettingRow row, double value, double min, double max, int decimals, Action<double, SulfurSettingHandle> onChanged, out SulfurSettingHandle handle);
+```
+
+They are overloads, not new names: a call that compiled before still picks the
+float version (with `float`, `int` or other integer arguments the float
+parameters are the better match, and a lambda `v => ...` fits both delegates
+equally), so existing mods are unaffected. Pass a `double` value (or `double`
+bounds) to get the double version:
+
+```csharp
+ctx.AddNumberInput("Seed", seed, 0d, 1e15, 0, v => seed = v);           // double
+ctx.AddNumberInput("Port", port, 0f, 65535f, 0, v => port = (int)v);     // float, as before
+```
+
 ### Inline inputs (label and input on the same line)
 
 ```csharp
@@ -465,6 +503,9 @@ ctx.AddInlineTextInput("Password", pass, v => pass = v, password: true);
 ctx.AddInlineNumberInput("Timeout", timeout, 0f, 60f, 1, v => timeout = v);
 ```
 
+`AddInlineNumberInput` also has a `double` overload; see
+[Number precision](#number-precision-float-and-double).
+
 ---
 
 ## Setting row APIs
@@ -491,6 +532,16 @@ ctx.AddSettingCycleEx(row, values, currentIndex, onChanged, out handle);
 
 Use the `Ex` methods for large pages and config editors.
 
+`AddSettingNumber` / `AddSettingNumberEx` take `float` or `double` values; see
+[Number precision](#number-precision-float-and-double).
+
+A row built with an `Ex` method always has its message line and, when
+`OnDefault` is set, its Default button, also when they start hidden (empty
+`Message`, `ShowDefaultButton = false`), so the handle can show them later. A
+hidden part is an inactive row: it takes no space and is no navigation stop.
+(The non-`Ex` methods are built the same way; they just do not hand out the
+handle.) `AddSettingMeta` on its own builds only what is visible, as before.
+
 ---
 
 ## Keyboard and gamepad navigation
@@ -502,7 +553,7 @@ screen order, with the game's own selection highlight (the white row border):
 
 | Widget | Use (Enter / A) | Left / right |
 |---|---|---|
-| foldout header (`AddFoldout*`) | toggles it; the same header stays selected | — |
+| foldout header (`AddFoldout*`) | toggles it; the same header stays selected (nothing while `forceExpanded`) | — |
 | `AddSmallButton`, `AddDefaultButton`, setting-row Default button | presses it (if interactable) | — |
 | `AddButtonRow` | presses the focused button | moves the focus between the buttons |
 | `AddTextInput` / `AddNumberInput` (and the setting text/number rows) | starts typing | — |
@@ -511,9 +562,18 @@ screen order, with the game's own selection highlight (the white row border):
 
 - A **button row** is one navigation stop. The focused button carries a thin
   white frame while the row is selected; hidden and non-interactable buttons are
-  skipped, and there is no wrap-around. A list refreshed with
-  `SulfurListHandle.Update` rebuilds its button rows, so their focus starts at
-  the first button again.
+  skipped, and there is no wrap-around. A rebuild keeps the focus of every
+  button row: `ctx.Rebuild()` (also from a foldout click) and
+  `SulfurListHandle.Update` give each rebuilt button row the focus of the row
+  that sat at the same position in the page's navigation order before — the
+  same key that keeps the selected row — clamped to the new row's buttons (a
+  hidden or disabled button moves it to the nearest usable one). When rows
+  above it appear or disappear in that rebuild, the position belongs to another
+  row, and so does the remembered focus, just as for the selected row. Opening
+  the page afresh starts every row on its first button.
+- A **forced-open foldout** (`forceExpanded: true`) stays a navigation stop and
+  looks the same, but clicking it or Use does nothing (no hover/press tint
+  either); its stored open/closed state is left as the player set it.
 - In a **text input**, typing, the caret keys and Enter/Escape belong to the
   field. Enter or Escape ends editing and returns to row navigation with the same
   row selected. A stacked input is one stop: the row with the box (its label row
@@ -629,12 +689,84 @@ handle.SetDirty(entry.IsDirty);
 handle.SetMessage(
     "This setting has unsaved pending changes. Click Apply to write it to cfg.",
     SulfurMessageKind.Warning);
+
+handle.SetMessage("", SulfurMessageKind.Info);   // hides the message line
 ```
+
+Every row built with an `Ex` method has a message line, also when it was built
+without a `Message` (since 0.11.0; before, `SetMessage` silently did nothing on
+such a row). An empty or whitespace text hides the line; a non-empty text shows
+it with the kind's prefix and background. A hidden line takes no space (the
+row's height is the same as a row built without a message) and is no
+navigation stop.
 
 ### SetActive
 
 ```csharp
 handle.SetActive(false);
+```
+
+Hides or shows every row of the setting block. Showing it again keeps a hidden
+message line (empty message) and a Default button hidden with
+`SetDefaultButtonVisible(false)` hidden.
+
+### Setting the value without a rebuild
+
+```csharp
+public bool SetValueWithoutNotify(bool value);    // AddSettingToggleEx rows
+public bool SetValueWithoutNotify(float value);   // AddSettingNumberEx rows
+public bool SetValueWithoutNotify(double value);  // AddSettingNumberEx rows
+public bool SetValueWithoutNotify(string value);  // AddSettingTextEx rows
+public bool SetIndexWithoutNotify(int index);     // AddSettingCycleEx rows
+```
+
+Shows a new value in the row's control without calling the row's `onChanged`
+(for example after a "Default" button set the draft back to its default). Each
+works only on the kind of row the handle was built for; on another kind, or
+once the row is gone (its page closed or rebuilt), it does nothing and returns
+`false`. None of them throws.
+
+- **Toggle**: sets the checkbox through the row's binding; works while the row
+  is locked.
+- **Number**: shows the value formatted with the row's `decimals`, not clamped
+  (the same as the value the row was built with), and makes it the value
+  unparseable input reverts to. Both overloads work on float and double rows;
+  a float row stores the value as `float`.
+- **Text**: sets the field's text (`null` as `""`); typing still reports
+  every change as before.
+- **Cycle**: shows the value at `index` (clamped). It has its own name so that
+  an integer literal (`handle.SetValueWithoutNotify(5)`) always means a number.
+
+### SetDefaultButtonVisible
+
+```csharp
+public bool SetDefaultButtonVisible(bool visible);
+```
+
+Shows or hides the row's Default button. The button is built whenever the row
+has an `OnDefault` action, also with `ShowDefaultButton = false` (it then starts
+hidden), so it can be shown later; returns `false` when the row has no
+`OnDefault` or is gone. A hidden button takes no space and is no navigation
+stop. If the button is hidden while it is the selected row (Use on Default),
+the next up/down moves on from its position.
+
+Example: a Default button that updates the row in place instead of rebuilding
+the page:
+
+```csharp
+SulfurSettingHandle handle = null;
+
+row.ShowDefaultButton = current != entry.DefaultValue;
+row.OnDefault = () =>
+{
+    drafts.Set(entry, entry.DefaultValue);
+    handle.SetValueWithoutNotify(entry.DefaultBool);
+    handle.SetDirty(drafts.IsPending(entry));
+    handle.SetMessage(GetMessage(entry), SulfurMessageKind.Info);
+    handle.SetDefaultButtonVisible(false);
+};
+
+ctx.AddSettingToggleEx(row, value, (v, h) => Commit(entry, v, h), out handle);
 ```
 
 ---

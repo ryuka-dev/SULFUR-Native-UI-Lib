@@ -55,8 +55,10 @@ namespace Ryuka.Sulfur.NativeUI
                 return;
 
             // Selection is reconciled once, after the rebuild, so a cursor that was on a
-            // list row lands on the rebuilt row at the same position.
+            // list row lands on the rebuilt row at the same position. Button rows rebuilt in
+            // the list keep their in-row focus by the same position.
             int previousSelectedIndex = context.CaptureSelectedOptionIndex();
+            SulfurButtonRowNavigator.FocusCarry previousFocusCarry = context.BeginButtonFocusCarry();
 
             try
             {
@@ -77,6 +79,7 @@ namespace Ryuka.Sulfur.NativeUI
             }
             finally
             {
+                SulfurButtonRowNavigator.EndFocusCarry(previousFocusCarry);
                 context.ReconcileSelectedOption(previousSelectedIndex);
             }
         }

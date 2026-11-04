@@ -115,6 +115,9 @@ bool pluginExpanded = ctx.AddPluginFoldoutWithBadges(
 ```
 
 When filtering, `forceExpanded` can be `true` so users immediately see search results.
+A forced-open header cannot be collapsed: clicking it (or Use on it) does nothing and
+leaves the stored foldout state alone, so once the filter is cleared each foldout is
+open or closed as the player left it.
 
 ---
 

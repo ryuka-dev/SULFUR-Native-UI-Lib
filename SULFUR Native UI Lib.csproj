@@ -119,6 +119,7 @@
     <Compile Include="Integration\SulfurNavigationProxy.cs" />
     <Compile Include="Rows\SulfurSettingRow.cs" />
     <Compile Include="Rows\SulfurSettingHandle.cs" />
+    <Compile Include="Rows\SulfurSettingParts.cs" />
     <Compile Include="Rows\SulfurTextHandle.cs" />
     <Compile Include="Rows\SulfurButtonHandle.cs" />
     <Compile Include="Rows\SulfurListHandle.cs" />
@@ -133,6 +134,7 @@
     <Compile Include="Input\SulfurTextInputBinding.cs" />
     <Compile Include="Input\SulfurInputCaretOverlay.cs" />
     <Compile Include="Input\SulfurInputVisualState.cs" />
+    <Compile Include="Input\SulfurNumberInput.cs" />
     <Compile Include="State\SulfurPageStateStore.cs" />
     <Compile Include="State\SulfurOptionsStateExtensions.cs" />
     <Compile Include="Localization\SulfurLocalization.cs" />

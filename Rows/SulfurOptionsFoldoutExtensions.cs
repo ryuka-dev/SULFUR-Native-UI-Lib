@@ -138,18 +138,27 @@ namespace Ryuka.Sulfur.NativeUI
             string stateKey = "foldout." + (key ?? label ?? "unnamed");
             bool expanded = forceExpanded || ctx.GetState(stateKey, defaultExpanded);
 
+            // A forced-open header cannot be collapsed: its click is ignored (no state change,
+            // no rebuild), so the stored state is still the player's own once the force is
+            // lifted. The header keeps its place and look; see CreateFoldoutRow.
+            UnityAction onPressed = null;
+            if (!forceExpanded)
+            {
+                onPressed = delegate
+                {
+                    bool current = ctx.GetState(stateKey, defaultExpanded);
+                    ctx.SetState(stateKey, !current);
+                    ctx.Rebuild();
+                };
+            }
+
             CreateFoldoutRow(
                 ctx,
                 key,
                 label,
                 expanded,
                 style,
-                delegate
-                {
-                    bool current = ctx.GetState(stateKey, defaultExpanded);
-                    ctx.SetState(stateKey, !current);
-                    ctx.Rebuild();
-                });
+                onPressed);
 
             if (!string.IsNullOrWhiteSpace(description))
                 ctx.AddDescription(description);
@@ -228,7 +237,20 @@ namespace Ryuka.Sulfur.NativeUI
 
             button.onClick.RemoveAllListeners();
             if (onPressed != null)
+            {
                 button.onClick.AddListener(onPressed);
+            }
+            else
+            {
+                // Nothing to toggle (forced open): not interactable, so the mouse gets no
+                // hover/press tint and keyboard/gamepad Use (SulfurNavigationProxy.Press)
+                // does nothing. The disabled tint is the normal one, so the header is not
+                // dimmed like a disabled control; it is still a navigation stop, which keeps
+                // the page's navigation indices the same whether or not it is forced.
+                colors.disabledColor = colors.normalColor;
+                button.colors = colors;
+                button.interactable = false;
+            }
 
             if (style == SulfurFoldoutStyle.Plugin)
                 CreateAccentLine(row.transform, baseColor);

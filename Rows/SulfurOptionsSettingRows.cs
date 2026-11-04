@@ -60,6 +60,24 @@ namespace Ryuka.Sulfur.NativeUI
             }, out ignored);
         }
 
+        /// <summary>As the float <c>AddSettingNumber</c>, for a double value (see the double <c>AddSettingNumberEx</c>).</summary>
+        public static OptionsScreenOption AddSettingNumber(
+            this SulfurOptionsContext ctx,
+            SulfurSettingRow row,
+            double value,
+            double min,
+            double max,
+            int decimals,
+            Action<double> onChanged)
+        {
+            SulfurSettingHandle ignored;
+            return AddSettingNumberEx(ctx, row, value, min, max, decimals, delegate(double v, SulfurSettingHandle h)
+            {
+                if (onChanged != null)
+                    onChanged(v);
+            }, out ignored);
+        }
+
         public static OptionsScreenOption AddSettingCycle(
             this SulfurOptionsContext ctx,
             SulfurSettingRow row,
@@ -115,8 +133,9 @@ namespace Ryuka.Sulfur.NativeUI
             row = Normalize(row);
             int start = GetChildCount(ctx);
             SulfurSettingHandle localHandle = null;
+            SulfurSettingParts parts = new SulfurSettingParts { Kind = SulfurSettingControlKind.Toggle };
 
-            OptionsScreenOption option = ctx.AddToggle(
+            OptionsScreenOption option = ctx.AddToggleCore(
                 row.Label,
                 row.Description,
                 value,
@@ -124,12 +143,14 @@ namespace Ryuka.Sulfur.NativeUI
                 {
                     if (onChanged != null)
                         onChanged(v, localHandle);
-                });
+                },
+                out parts.Toggle,
+                out parts.Binding);
 
-            AddSettingMeta(ctx, row);
+            AddSettingMetaParts(ctx, row, parts);
             ApplyIndentToNewChildren(ctx, start, row);
 
-            localHandle = CreateHandle(ctx, start, row);
+            localHandle = CreateHandle(ctx, start, row, parts);
             handle = localHandle;
             return option;
         }
@@ -144,8 +165,9 @@ namespace Ryuka.Sulfur.NativeUI
             row = Normalize(row);
             int start = GetChildCount(ctx);
             SulfurSettingHandle localHandle = null;
+            SulfurSettingParts parts = new SulfurSettingParts { Kind = SulfurSettingControlKind.Text };
 
-            OptionsScreenOption option = ctx.AddTextInput(
+            OptionsScreenOption option = ctx.AddTextInputCore(
                 row.Label,
                 row.Description,
                 value,
@@ -153,16 +175,22 @@ namespace Ryuka.Sulfur.NativeUI
                 {
                     if (onChanged != null)
                         onChanged(v, localHandle);
-                });
+                },
+                out parts.TextInput);
 
-            AddSettingMeta(ctx, row);
+            AddSettingMetaParts(ctx, row, parts);
             ApplyIndentToNewChildren(ctx, start, row);
 
-            localHandle = CreateHandle(ctx, start, row);
+            localHandle = CreateHandle(ctx, start, row, parts);
             handle = localHandle;
             return option;
         }
 
+        /// <summary>
+        /// Adds a number setting row for a float value. Float holds about 7 significant
+        /// digits: larger or more precise values are shown and reported rounded. Use the
+        /// double overload for those.
+        /// </summary>
         public static OptionsScreenOption AddSettingNumberEx(
             this SulfurOptionsContext ctx,
             SulfurSettingRow row,
@@ -176,8 +204,9 @@ namespace Ryuka.Sulfur.NativeUI
             row = Normalize(row);
             int start = GetChildCount(ctx);
             SulfurSettingHandle localHandle = null;
+            SulfurSettingParts parts = new SulfurSettingParts { Kind = SulfurSettingControlKind.Number };
 
-            OptionsScreenOption option = ctx.AddNumberInput(
+            OptionsScreenOption option = ctx.AddNumberInputCore(
                 row.Label,
                 row.Description,
                 value,
@@ -188,12 +217,59 @@ namespace Ryuka.Sulfur.NativeUI
                 {
                     if (onChanged != null)
                         onChanged(v, localHandle);
-                });
+                },
+                null,
+                false,
+                out parts.Number);
 
-            AddSettingMeta(ctx, row);
+            AddSettingMetaParts(ctx, row, parts);
             ApplyIndentToNewChildren(ctx, start, row);
 
-            localHandle = CreateHandle(ctx, start, row);
+            localHandle = CreateHandle(ctx, start, row, parts);
+            handle = localHandle;
+            return option;
+        }
+
+        /// <summary>
+        /// Adds a number setting row for a double value: parsed, clamped, rounded and
+        /// formatted in double with the invariant culture, exact up to 15 significant digits.
+        /// Otherwise the same as the float overload.
+        /// </summary>
+        public static OptionsScreenOption AddSettingNumberEx(
+            this SulfurOptionsContext ctx,
+            SulfurSettingRow row,
+            double value,
+            double min,
+            double max,
+            int decimals,
+            Action<double, SulfurSettingHandle> onChanged,
+            out SulfurSettingHandle handle)
+        {
+            row = Normalize(row);
+            int start = GetChildCount(ctx);
+            SulfurSettingHandle localHandle = null;
+            SulfurSettingParts parts = new SulfurSettingParts { Kind = SulfurSettingControlKind.Number };
+
+            OptionsScreenOption option = ctx.AddNumberInputCore(
+                row.Label,
+                row.Description,
+                value,
+                min,
+                max,
+                decimals,
+                null,
+                delegate(double v)
+                {
+                    if (onChanged != null)
+                        onChanged(v, localHandle);
+                },
+                true,
+                out parts.Number);
+
+            AddSettingMetaParts(ctx, row, parts);
+            ApplyIndentToNewChildren(ctx, start, row);
+
+            localHandle = CreateHandle(ctx, start, row, parts);
             handle = localHandle;
             return option;
         }
@@ -209,8 +285,9 @@ namespace Ryuka.Sulfur.NativeUI
             row = Normalize(row);
             int start = GetChildCount(ctx);
             SulfurSettingHandle localHandle = null;
+            SulfurSettingParts parts = new SulfurSettingParts { Kind = SulfurSettingControlKind.Cycle };
 
-            OptionsScreenOption option = ctx.AddCycle(
+            OptionsScreenOption option = ctx.AddCycleCore(
                 row.Label,
                 row.Description,
                 values,
@@ -219,36 +296,66 @@ namespace Ryuka.Sulfur.NativeUI
                 {
                     if (onChanged != null)
                         onChanged(i, v, localHandle);
-                });
+                },
+                out parts.Binding);
 
-            AddSettingMeta(ctx, row);
+            AddSettingMetaParts(ctx, row, parts);
             ApplyIndentToNewChildren(ctx, start, row);
 
-            localHandle = CreateHandle(ctx, start, row);
+            localHandle = CreateHandle(ctx, start, row, parts);
             handle = localHandle;
             return option;
         }
 
+        /// <summary>
+        /// Adds the badge row, the message line (when <see cref="SulfurSettingRow.Message"/>
+        /// is set) and the Default button (when <see cref="SulfurSettingRow.ShowDefaultButton"/>
+        /// is true and <see cref="SulfurSettingRow.OnDefault"/> is set) of a setting row.
+        /// </summary>
         public static void AddSettingMeta(
             this SulfurOptionsContext ctx,
             SulfurSettingRow row)
         {
+            AddSettingMetaParts(ctx, row, null);
+        }
+
+        // With parts (a row that gets a handle) the message line and the Default button are
+        // built also when they start hidden: an empty message line and a Default button with
+        // ShowDefaultButton false are inactive (layout groups skip inactive rows, and an
+        // inactive row is no navigation stop), so the handle can show them later. Without
+        // parts nothing hidden is built (the original AddSettingMeta).
+        private static void AddSettingMetaParts(
+            SulfurOptionsContext ctx,
+            SulfurSettingRow row,
+            SulfurSettingParts parts)
+        {
             row = Normalize(row);
+            bool forHandle = parts != null;
 
             List<string> badges = BuildBadges(row);
-            if (badges.Count > 0)
-                ctx.AddBadgeRow(badges);
+            GameObject badgeRow = badges.Count > 0 ? ctx.AddBadgeRowObject(badges) : null;
 
-            if (!string.IsNullOrWhiteSpace(row.Message))
-                ctx.AddMessage(row.Message, row.MessageKind);
+            GameObject messageRow = ctx.AddMessageRow(row.Message, row.MessageKind, forHandle);
 
-            if (row.ShowDefaultButton && row.OnDefault != null)
+            GameObject defaultButtonRow = null;
+            if (row.OnDefault != null && (row.ShowDefaultButton || forHandle))
             {
-                ctx.AddSmallButton(
+                defaultButtonRow = ctx.AddSmallButtonRow(
                     string.IsNullOrWhiteSpace(row.DefaultButtonText)
                         ? SulfurUiText.DefaultButton
                         : SulfurUiText.ForSettingRow(row.DefaultButtonText, SulfurSettingRow.BuiltInDefaultButtonText, SulfurUiText.DefaultButton),
-                    row.OnDefault);
+                    row.OnDefault,
+                    0f);
+
+                if (defaultButtonRow != null && !row.ShowDefaultButton)
+                    defaultButtonRow.SetActive(false);
+            }
+
+            if (parts != null)
+            {
+                parts.BadgeRow = badgeRow;
+                parts.MessageRow = messageRow;
+                parts.DefaultButtonRow = defaultButtonRow;
             }
         }
 
@@ -298,12 +405,14 @@ namespace Ryuka.Sulfur.NativeUI
         private static SulfurSettingHandle CreateHandle(
             SulfurOptionsContext ctx,
             int startIndex,
-            SulfurSettingRow row)
+            SulfurSettingRow row,
+            SulfurSettingParts parts)
         {
-            if (ctx == null)
-                return new SulfurSettingHandle(row, null);
+            // A closed context added nothing; its container is the live page's.
+            if (ctx == null || !ctx.IsAlive)
+                return new SulfurSettingHandle(row, null, parts);
 
-            return new SulfurSettingHandle(row, ctx.GetChildrenFrom(startIndex).ToList());
+            return new SulfurSettingHandle(row, ctx.GetChildrenFrom(startIndex).ToList(), parts);
         }
 
         private static SulfurSettingRow Normalize(SulfurSettingRow row)

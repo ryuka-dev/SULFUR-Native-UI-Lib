@@ -47,6 +47,84 @@ namespace Ryuka.Sulfur.NativeUI
             focusIndex = 0;
         }
 
+        // --- Focus kept across a rebuild -------------------------------------------------
+        //
+        // A rebuild (ctx.Rebuild, a foldout click, SulfurListHandle.Update) destroys the
+        // navigators and builds new ones. The game's selected row is kept by its index in the
+        // page's navigation list (OptionsScreen.options); the in-row focus is kept by the same
+        // key, so the row that ends up selected is the row whose focus is restored. Captured
+        // right before the old rows go away and consumed while the new ones are built: the
+        // carry lives only for the duration of that rebuild call, so a page opened afresh, or
+        // a page whose state was cleared, starts every row on its first button as before.
+
+        internal sealed class FocusCarry
+        {
+            public string PageId;
+            public readonly Dictionary<int, int> FocusByNavigationIndex = new Dictionary<int, int>();
+        }
+
+        private static FocusCarry activeCarry;
+
+        /// <summary>
+        /// Records the focus of every button row in <paramref name="options"/> (the page's
+        /// navigation list) for the rebuild about to run. Returns the carry it replaces; pass
+        /// that to <see cref="EndFocusCarry"/> when the rebuild call returns.
+        /// </summary>
+        internal static FocusCarry BeginFocusCarry(string pageId, IList<PerfectRandom.Sulfur.Core.OptionsScreenOption> options)
+        {
+            FocusCarry previous = activeCarry;
+            FocusCarry carry = new FocusCarry { PageId = pageId };
+
+            // Nested inside a rebuild of the same page (a list filled by BuildPage while
+            // ctx.Rebuild runs): positions not built yet still take the outer rebuild's focus.
+            // Both use the same key, the position in the page's navigation list.
+            if (previous != null && string.Equals(previous.PageId, pageId, System.StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (KeyValuePair<int, int> entry in previous.FocusByNavigationIndex)
+                    carry.FocusByNavigationIndex[entry.Key] = entry.Value;
+            }
+
+            if (options != null)
+            {
+                for (int i = 0; i < options.Count; i++)
+                {
+                    PerfectRandom.Sulfur.Core.OptionsScreenOption option = options[i];
+                    if (option == null)
+                        continue;
+
+                    SulfurButtonRowNavigator navigator = option.GetComponent<SulfurButtonRowNavigator>();
+                    if (navigator != null && navigator.focusIndex > 0)
+                        carry.FocusByNavigationIndex[i] = navigator.focusIndex;
+                }
+            }
+
+            activeCarry = carry;
+            return previous;
+        }
+
+        internal static void EndFocusCarry(FocusCarry previous)
+        {
+            activeCarry = previous;
+        }
+
+        /// <summary>
+        /// Takes the focus recorded for <paramref name="navigationIndex"/> by the rebuild in
+        /// progress, clamped to this row's buttons. Does nothing outside a rebuild.
+        /// </summary>
+        internal void RestoreCarriedFocus(string pageId, int navigationIndex)
+        {
+            FocusCarry carry = activeCarry;
+            if (carry == null || navigationIndex < 0 || buttons.Count == 0)
+                return;
+
+            if (!string.Equals(carry.PageId, pageId, System.StringComparison.OrdinalIgnoreCase))
+                return;
+
+            int index;
+            if (carry.FocusByNavigationIndex.TryGetValue(navigationIndex, out index))
+                focusIndex = Mathf.Clamp(index, 0, buttons.Count - 1);
+        }
+
         public void Move(int delta)
         {
             if (delta == 0 || buttons.Count == 0)

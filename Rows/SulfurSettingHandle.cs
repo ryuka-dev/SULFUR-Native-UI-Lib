@@ -9,17 +9,39 @@ namespace Ryuka.Sulfur.NativeUI
     /// Runtime handle for a setting row block.
     /// This allows config editors to update the current row state without rebuilding the whole options page.
     /// </summary>
+    /// <remarks>
+    /// The value setters work only on the kind of row the handle was built for
+    /// (<c>AddSettingToggleEx</c>: bool, <c>AddSettingTextEx</c>: string,
+    /// <c>AddSettingNumberEx</c>: float/double, <c>AddSettingCycleEx</c>: index). On another
+    /// kind, or once the row is gone (its page closed or rebuilt), they do nothing and return
+    /// false; they never throw.
+    /// </remarks>
     public sealed class SulfurSettingHandle
     {
         private readonly List<Transform> createdChildren = new List<Transform>();
         private readonly SulfurSettingRow row;
+        private readonly SulfurSettingParts parts;
         private readonly TextMeshProUGUI statusBadgeText;
         private readonly TextMeshProUGUI messageText;
         private readonly Image messageBackground;
+        private readonly GameObject messageRow;
+        private readonly GameObject defaultButtonRow;
+
+        // What SetActive(true) brings back: the message line only while it has a message,
+        // the Default button only while it is meant to be shown.
+        private bool rowActive = true;
+        private bool messageVisible;
+        private bool defaultButtonVisible;
 
         internal SulfurSettingHandle(SulfurSettingRow row, IEnumerable<Transform> children)
+            : this(row, children, null)
+        {
+        }
+
+        internal SulfurSettingHandle(SulfurSettingRow row, IEnumerable<Transform> children, SulfurSettingParts parts)
         {
             this.row = row ?? new SulfurSettingRow();
+            this.parts = parts ?? new SulfurSettingParts();
 
             if (children != null)
             {
@@ -30,11 +52,20 @@ namespace Ryuka.Sulfur.NativeUI
                 }
             }
 
-            statusBadgeText = FindFirstBadgeText();
-            messageText = FindMessageText();
+            statusBadgeText = FirstText(this.parts.BadgeRow) ?? FindFirstBadgeText();
 
-            if (messageText != null)
+            messageRow = this.parts.MessageRow;
+            messageText = messageRow != null ? FirstText(messageRow) : FindMessageText();
+
+            if (messageRow != null)
+                messageBackground = messageRow.GetComponent<Image>();
+            else if (messageText != null)
                 messageBackground = messageText.GetComponentInParent<Image>();
+
+            messageVisible = !string.IsNullOrWhiteSpace(this.row.Message);
+
+            defaultButtonRow = this.parts.DefaultButtonRow;
+            defaultButtonVisible = this.row.ShowDefaultButton;
         }
 
         public void SetDirty(bool dirty)
@@ -58,6 +89,12 @@ namespace Ryuka.Sulfur.NativeUI
             statusBadgeText.text = text;
         }
 
+        /// <summary>
+        /// Shows <paramref name="text"/> on the row's message line, styled for
+        /// <paramref name="kind"/>. An empty (or whitespace) text hides the line; a non-empty
+        /// one shows it again. The line exists for every row built with an <c>Ex</c> method,
+        /// also when the row was built without a message.
+        /// </summary>
         public void SetMessage(string text, SulfurMessageKind kind)
         {
             row.Message = text ?? "";
@@ -66,19 +103,149 @@ namespace Ryuka.Sulfur.NativeUI
             if (messageText == null)
                 return;
 
-            messageText.text = SulfurUiText.GetMessagePrefix(kind) + (text ?? "");
+            bool empty = string.IsNullOrWhiteSpace(text);
+
+            // Rows found by name (no build-time parts) keep the original behaviour: always shown.
+            if (messageRow == null)
+                messageText.text = SulfurUiText.GetMessagePrefix(kind) + (text ?? "");
+            else
+                messageText.text = empty ? "" : SulfurUiText.GetMessagePrefix(kind) + text;
 
             if (messageBackground != null)
                 messageBackground.color = GetMessageBackground(kind);
+
+            if (messageRow != null)
+            {
+                messageVisible = !empty;
+                messageRow.SetActive(rowActive && messageVisible);
+            }
         }
 
+        /// <summary>
+        /// Shows or hides every row of the setting block. Showing it again keeps an empty
+        /// message line and a Default button hidden with <see cref="SetDefaultButtonVisible"/>
+        /// hidden.
+        /// </summary>
         public void SetActive(bool active)
         {
+            rowActive = active;
+
             foreach (Transform child in createdChildren)
             {
-                if (child != null)
-                    child.gameObject.SetActive(active);
+                if (child == null)
+                    continue;
+
+                GameObject go = child.gameObject;
+                bool wanted = active;
+
+                if (messageRow != null && go == messageRow)
+                    wanted = active && messageVisible;
+                else if (defaultButtonRow != null && go == defaultButtonRow)
+                    wanted = active && defaultButtonVisible;
+
+                go.SetActive(wanted);
             }
+        }
+
+        /// <summary>
+        /// Shows or hides the row's Default button. The button exists when the row was built
+        /// with an <see cref="SulfurSettingRow.OnDefault"/> action, whether or not
+        /// <see cref="SulfurSettingRow.ShowDefaultButton"/> was true; returns false when it
+        /// does not exist (no OnDefault) or is gone. A hidden button is no navigation stop.
+        /// </summary>
+        public bool SetDefaultButtonVisible(bool visible)
+        {
+            row.ShowDefaultButton = visible;
+
+            if (defaultButtonRow == null)
+                return false;
+
+            defaultButtonVisible = visible;
+            defaultButtonRow.SetActive(rowActive && visible);
+            return true;
+        }
+
+        /// <summary>
+        /// Toggle rows: shows <paramref name="value"/> without calling the row's onChanged
+        /// (also while the row is locked). False on another kind of row or when the row is gone.
+        /// </summary>
+        public bool SetValueWithoutNotify(bool value)
+        {
+            if (parts.Kind != SulfurSettingControlKind.Toggle)
+                return false;
+
+            if (parts.Binding != null && parts.Binding.SetToggleValueWithoutNotify(value))
+                return true;
+
+            if (parts.Toggle == null)
+                return false;
+
+            parts.Toggle.SetIsOnWithoutNotify(value);
+            return true;
+        }
+
+        /// <summary>
+        /// Number rows: shows <paramref name="value"/> formatted with the row's decimals
+        /// (not clamped, like the build value), without calling onChanged, and makes it the
+        /// value unparseable input reverts to. A double row takes the float as is. False on
+        /// another kind of row or when the row is gone.
+        /// </summary>
+        public bool SetValueWithoutNotify(float value)
+        {
+            return SetNumber(value);
+        }
+
+        /// <summary>
+        /// Number rows: as <see cref="SetValueWithoutNotify(float)"/>. A float row stores the
+        /// value as float (about 7 significant digits); a double row exactly.
+        /// </summary>
+        public bool SetValueWithoutNotify(double value)
+        {
+            return SetNumber(value);
+        }
+
+        /// <summary>
+        /// Text rows: shows <paramref name="value"/> (null as "") without calling onChanged.
+        /// False on another kind of row or when the row is gone.
+        /// </summary>
+        public bool SetValueWithoutNotify(string value)
+        {
+            if (parts.Kind != SulfurSettingControlKind.Text || parts.TextInput == null)
+                return false;
+
+            parts.TextInput.SetTextWithoutNotify(value ?? "");
+            return true;
+        }
+
+        /// <summary>
+        /// Cycle rows: shows the value at <paramref name="index"/> (clamped) without calling
+        /// onChanged. Named apart from <c>SetValueWithoutNotify</c> so an integer literal meant
+        /// for a number row cannot pick it. False on another kind of row or when the row is gone.
+        /// </summary>
+        public bool SetIndexWithoutNotify(int index)
+        {
+            if (parts.Kind != SulfurSettingControlKind.Cycle || parts.Binding == null)
+                return false;
+
+            parts.Binding.SetCycleIndexWithoutNotify(index);
+            return true;
+        }
+
+        private bool SetNumber(double value)
+        {
+            if (parts.Kind != SulfurSettingControlKind.Number || parts.Number == null)
+                return false;
+
+            return parts.Number.SetValueWithoutNotify(value);
+        }
+
+        private static TextMeshProUGUI FirstText(GameObject root)
+        {
+            if (root == null)
+                return null;
+
+            TextMeshProUGUI[] texts = root.GetComponentsInChildren<TextMeshProUGUI>(true);
+            return texts != null && texts.Length > 0 ? texts[0] : null;
         }
 
         private TextMeshProUGUI FindFirstBadgeText()
