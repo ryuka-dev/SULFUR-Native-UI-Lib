@@ -232,7 +232,7 @@
   fade + scale on enter/exit with a slight overshoot, `SmoothDamp` restacking —
   all on unscaled time. Self-built uGUI overlay, passive (no `Time.timeScale`,
   no input capture, no cursor-lock change), language-correct font. See
-  `docs/TOAST_NOTIFICATIONS.md`.
+  [Toasts](docs/API_REFERENCE.md#toasts).
 
 ### Changed
 
@@ -252,7 +252,7 @@
   from live game text. Display-only and passive — no `Time.timeScale` change,
   no input capture, no cursor-lock change; the caller keeps ownership of any
   keypress. Created lazily on first show and free while hidden. See
-  `docs/POPUP_BANNER.md`.
+  [Popup banner](docs/API_REFERENCE.md#popup-banner).
 
 ## 0.7.3
 

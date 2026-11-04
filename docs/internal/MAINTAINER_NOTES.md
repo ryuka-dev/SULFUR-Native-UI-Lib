@@ -5,7 +5,8 @@ built on them. Each one cost a debugging round to find. Verified on SULFUR 1.0.4
 (Steam build 26433890) unless stated otherwise; re-check against the decompiled game
 after an update before relying on them.
 
-Not user documentation — users read `README.md` and `docs/API_REFERENCE.md`.
+Not user documentation — users read `README.md` and `docs/API_REFERENCE.md`. Component map:
+`ARCHITECTURE.md`.
 
 ## Rules for changing the library
 
@@ -21,6 +22,10 @@ Not user documentation — users read `README.md` and `docs/API_REFERENCE.md`.
   the options bridge). Public API uses project types (`SulfurFontRole`, language codes as
   strings), except where it already exposed game types before (`OptionsScreenOption`).
 - **Diagnostics never change behaviour.** Missing-member warnings are logged once.
+- **UI only.** No BepInEx config handling in the library: no `ConfigEntryBase` /
+  `ConfigFile`, scanning, applying, saving, backups or dirty-state calculation. Those belong
+  to the consuming mod (SULFUR Config); the library only renders what it is given
+  (`SulfurSettingRow.IsDirty`, ...).
 
 ## Fonts
 
@@ -92,6 +97,20 @@ Not user documentation — users read `README.md` and `docs/API_REFERENCE.md`.
 - Description, message and text rows grow with wrapped text through
   `SulfurRowHeightFitter` (measured at build time and on text changes, never from a layout
   callback); single-line rows keep their exact height.
+- Row style sample (`FindSampleText`): size and colour from an option **prefab**, font from
+  `SulfurFonts.Get(SerifRegular)`. Sampling size from rows in the container shrank fonts on
+  every rebuild (those rows are already restyled smaller); the prefab's own font is the
+  Latin default, which the game swaps only on instantiated rows.
+- Themed groups: no Unity `Outline` (it redraws the whole `Image`, so the group looks
+  filled). The frame is four `Image` lines (sides 4px, top/bottom 2px) under a
+  `BorderOverlay` child with `LayoutElement.ignoreLayout`, inset 2px (a line at x=0 gets
+  clipped), moved to the last
+  sibling when the scope is disposed so row backgrounds do not cover it. Background alpha
+  0.004. Fixed width `max(360, nativeWidth - indent + 24)` with top-left anchors and
+  min/preferred width set: stretch anchors made the group vanish under the screen's
+  `VerticalLayoutGroup` + `ContentSizeFitter`.
+- Foldout headers: arrow and label are separate TMP texts, so an ellipsised label never
+  hides the arrow. Open arrow "▼", closed ">"; "▼" may come from the glyph fallback.
 
 ## Game bug worked around
 

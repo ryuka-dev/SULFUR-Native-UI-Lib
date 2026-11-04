@@ -1,224 +1,81 @@
 # Troubleshooting
 
-## A setting edit takes more than one second
+## The page does not appear in the Options screen
 
-Cause:
+- Look for `Registered SULFUR native options page: <PageId>` in the BepInEx log.
+- `RegisterPage` throws when `PageId` or `BuildPage` is missing.
+- Another mod registered the same `PageId` (a warning names both); use your plugin GUID.
+- Without `[BepInDependency("ryuka.sulfur.nativeui")]` your plugin may load before the
+  library.
 
-```text
-ctx.Rebuild() is probably called after every value change.
-```
+## The page shows "This page failed to load"
 
-Fix:
+`BuildPage` threw. The full exception is in the BepInEx log the first time, with the page
+id.
 
-- Use `AddSettingXXXEx`.
-- Update the current row through `SulfurSettingHandle`.
-- Use `ctx.SetFooterStatus(...)` instead of `ctx.Rebuild()`.
+## A value edit takes a second or more
 
----
+The page is rebuilt on every change. Use a row handle instead of `ctx.Rebuild()`; see the
+[config editor guide](CONFIG_EDITOR_GUIDE.md#rules).
 
-## Edited value goes back to the old value
+## Edits are lost after a rebuild or rescan
 
-Cause:
+`BuildPage` re-reads the saved values. Keep unsaved drafts in your own model, outside the
+page, and restore them after a rescan.
 
-```text
-The page rebuilt and rescanned config entries before the draft was applied.
-```
+## Calls do nothing, log says "called on the options context ... after that page was closed or rebuilt"
 
-Fix:
+The `ctx` is dead: a rebuild, foldout click, category switch or closing the screen ended
+it. Use the `ctx` of the current `BuildPage` run, check `ctx.IsAlive` in late callbacks
+(timers, network events), and take new handles on every run. See
+[Calls on a dead context](API_REFERENCE.md#calls-on-a-dead-context).
 
-- Cache draft values.
-- Restore drafts after scanning.
-- Do not rebuild after ordinary edits.
+## `NullReferenceException` on a value returned by an `Add*` call
 
----
+On a dead context, `AddToggle`, `AddInlineTextInput`, `AddButton` and the other calls that
+return a row or field return `null`. Check `ctx.IsAlive`, or use the handle-returning calls.
 
-## The whole themed group looks yellow
+## `ArgumentOutOfRangeException` when indexing `AddButtonRow`'s result
 
-Cause:
+The list holds only the buttons that were built: empty labels are skipped, and a dead
+context returns an empty list. Check `Count`.
 
-```text
-Unity Outline was used on the group Image.
-```
+## The status badge does not change
 
-Unity `Outline` duplicates the whole Image graphic, so it can look like a paint-bucket fill.
+- Rows built with `AddSettingToggle` (no `Ex`) give no handle; use `AddSettingToggleEx`
+  and friends.
+- `SetDirty` rewrites the row's first badge. With `ShowCleanBadge = false` and
+  `IsDirty = false` at build time, that is another badge or none.
 
-Fix:
+## A row's label disappears after locking it
 
-- Remove `Outline`.
-- Use `BorderOverlay` with four thin Image lines.
-- Keep group background alpha very low or zero.
+The game's `OptionsScreenOption.SetLocked` hides labels of library rows. Use
+`SetLocked` on the row's handle (`AddToggleRow`, `AddSliderRow`, `AddCycleRow`).
 
----
+## Text shows boxes or blank characters
 
-## The group border disappears
+- Library rows use the game's option font (`SulfurFonts.Get(SulfurFontRole.SerifRegular)`)
+  and fill missing glyphs from installed system fonts automatically.
+- Text your mod creates itself should take its font from `SulfurFonts.Bind(text, role)` (or
+  `Get`), or run its own font through `SulfurFonts.WithFallback`. Do not copy the font of a
+  random game text: it may be a Latin-only font.
+- If boxes remain and the log says `No loadable OS font found for CJK glyph fallback`, the
+  system has none of the fonts the library looks for (common under Linux/Proton). Installing
+  one, e.g. Microsoft YaHei or Noto Sans CJK SC, fixes it.
 
-Possible causes:
+## Translations show English
 
-- Border lines were created before setting rows and got covered.
-- Border lines were affected by `VerticalLayoutGroup`.
-- Stretch anchors conflicted with the native layout.
+- The log lists every file loaded: `Loaded localization: <guid> / <code> / <n> entries`.
+  No line means the files were not found next to your DLL (see
+  [Localization](LOCALIZATION.md#files)).
+- File names must be language codes with a hyphen (`zh-CN.json`).
+- The key in `Get` must match the file exactly.
 
-Fix:
+## The library's own words ("Default", "Apply", message prefixes) stay English
 
-- Put all border lines under `BorderOverlay`.
-- Set `LayoutElement.ignoreLayout = true` on the overlay.
-- Move `BorderOverlay` to the last sibling when the group scope ends.
-- Use fixed calculated width instead of stretch anchors if the group disappears.
+Its `lang/` folder is missing next to `SULFUR Native UI Lib.dll`. Reinstall the package.
 
----
+## `MissingMethodException` mentioning `Ryuka.Sulfur.NativeUI`
 
-## Left border disappears
-
-Possible causes:
-
-- The line is clipped at x=0.
-- It is covered by child backgrounds.
-
-Fix:
-
-```csharp
-CreateBorderLine(overlay.transform, "BorderLeft", borderColor,
-    new Vector2(0f, 0f), new Vector2(0f, 1f),
-    new Vector2(2f, 0f), new Vector2(6f, 0f));
-```
-
-The border is moved inward by 2 px and has 4 px width.
-
----
-
-## Foldout arrow disappears
-
-Cause:
-
-```text
-The selected TMP font may not contain Unicode triangle glyphs.
-```
-
-Avoid:
-
-```text
-▶
-▼
-```
-
-Use:
-
-```text
->
-v
-```
-
-Also render arrow and label as separate TMP_Text objects.
-
----
-
-## TextAlignmentOptions.MidlineCenter compile error
-
-Cause:
-
-```text
-The game's TextMeshPro version does not include MidlineCenter.
-```
-
-Fix:
-
-```csharp
-TextAlignmentOptions.Center
-```
-
-If `MidlineLeft` fails:
-
-```csharp
-TextAlignmentOptions.Left
-```
-
----
-
-## Section content frame is too short on the right
-
-Tune width:
-
-```csharp
-float width = Mathf.Max(360f, GetNativeOptionWidth() - indentPixels + 24f);
-```
-
-Use:
-
-```text
-+12f  smaller
-+24f  default
-+48f  wider
-```
-
----
-
-## Section group disappears after switching to stretch anchors
-
-Cause:
-
-```text
-Stretch anchors may conflict with native VerticalLayoutGroup + ContentSizeFitter.
-```
-
-Fix:
-
-- Use fixed calculated width.
-- Set `LayoutElement.minWidth`.
-- Set `LayoutElement.preferredWidth`.
-- Set `flexibleWidth = 0f`.
-
----
-
-## The clean/pending badge does not update
-
-Cause:
-
-```text
-You used old AddSettingXXX methods instead of Ex methods.
-```
-
-Fix:
-
-```csharp
-SulfurSettingHandle handle;
-
-ctx.AddSettingToggleEx(row, value, (v, h) =>
-{
-    h.SetDirty(true, "Pending", "Unchanged");
-}, out handle);
-```
-
----
-
-## Apply button text should be short
-
-Recommended button text:
-
-```text
-Apply
-```
-
-Recommended Chinese:
-
-```text
-应用
-```
-
-Do not use overly long footer button labels when space is limited.
-
-## Custom rows are blank boxes in non-English languages
-
-Symptom: badges, descriptions, section headers, and text/number input rows show
-empty boxes (or only punctuation like `: 19`) when the game language is Chinese,
-Japanese, Korean, Russian, etc., while native option rows (toggles, cycles) and
-plain ASCII text render fine.
-
-Cause: these custom rows take their font from `FindSampleText()`. The game swaps
-the TextMeshPro font *asset* per language, but the option *prefabs* keep the
-default Latin asset, which has no glyphs for those scripts.
-
-Fixed in 0.7.3: `FindSampleText` takes the font *size* from the prefab (stable,
-so it does not compound on `Rebuild()`) but the font *asset and material* from
-the game's live, language-localized chrome. If you maintain a fork, do not
-sample both size and font from the prefab — sample the font from a live native
-text element outside the options container.
+The installed library is older than the one your mod was compiled against. Depend on that
+version in your manifest (`ryuka_labs-SULFUR_Native_UI_Lib-0.11.0`).

@@ -1,430 +1,191 @@
-# API Reference
+# API reference
 
-## SulfurOptionsApi
+Everything is in namespace `Ryuka.Sulfur.NativeUI` and must be called on Unity's main
+thread. Signatures below are exact; `ctx` is the `SulfurOptionsContext` passed to
+`BuildPage`.
 
-### RegisterPage
+- [Which call to use](#which-call-to-use)
+- [Page lifecycle](#page-lifecycle)
+- [Soft dependency](#soft-dependency)
+- [Pages](#pages)
+- [Context, rebuild and footer](#context-rebuild-and-footer)
+- [Static rows](#static-rows)
+- [Native rows and their handles](#native-rows-and-their-handles)
+- [Buttons](#buttons)
+- [Text rows and lists](#text-rows-and-lists)
+- [Badge rows](#badge-rows)
+- [Text and number inputs](#text-and-number-inputs)
+- [Foldouts](#foldouts)
+- [Themed groups](#themed-groups)
+- [Page state](#page-state)
+- [Setting rows](#setting-rows)
+- [Calls on a dead context](#calls-on-a-dead-context)
+- [Keyboard and gamepad navigation](#keyboard-and-gamepad-navigation)
+- [Toasts](#toasts)
+- [Popup banner](#popup-banner)
+- [Fonts](#fonts)
+- [Language](#language)
+- [Localization](#localization)
+- [Other public members](#other-public-members)
 
-Registers a custom page in the native Options screen.
+## Which call to use
+
+"Older" calls stay supported (compiled mods use them) but give you no way to change the
+row after building it.
+
+| Task | New code | Older |
+|---|---|---|
+| Checkbox | `AddToggleRow` | `AddToggle` |
+| Slider | `AddSliderRow` | `AddSlider` |
+| Pick one of several values | `AddCycleRow` | `AddCycle` |
+| Config-style setting (badges, message line, Default button) | `AddSettingToggleEx` / `AddSettingTextEx` / `AddSettingNumberEx` / `AddSettingCycleEx` | `AddSettingToggle` / `AddSettingText` / `AddSettingNumber` / `AddSettingCycle` / `AddSettingEnum<T>` |
+| Badges you update later | `AddBadgeRowEx`; `*FoldoutWithBadges(..., IReadOnlyList<string>, out SulfurBadgeRowHandle)` | `AddBadgeRow`; `*FoldoutWithBadges(..., params string[])` |
+| Text that changes while the page is open | `AddTextRow` | `AddDescription` (static, dimmed) |
+| Several buttons on one line | `AddButtonRow` | one `AddSmallButton` per row |
+| A part of the page that refreshes | `AddList` | `ctx.Rebuild()` |
+| Text input | `AddInlineTextInput` (returns the field), `AddSettingTextEx` | `AddTextInput` |
+| Number input | `AddInlineNumberInput`, `AddSettingNumberEx`; `double` overloads beyond ~7 digits | `AddNumberInput` |
+| Collapsible block | `AddFoldout` / `AddPluginFoldout` / `AddSectionFoldout` | |
+| Frame around a block | `BeginThemedGroup` | |
+| UI state across rebuilds | `GetState` / `SetState` | |
+| Footer summary, status, primary button | `SetFooter`, `SetFooterStatus` | |
+| Short message during play | `SulfurToastApi.Show` | |
+| Persistent message during play | `SulfurPopupApi.ShowBanner` / `HideBanner` | |
+| Font for your own text | `SulfurFonts.Bind` / `Get` | |
+| React to the game's language | `SulfurLanguage.Follow` | `SulfurLanguage.Changed`, `SulfurLocalization.LanguageVersion` |
+
+## Page lifecycle
+
+- `BuildPage` runs every time the page is built: when the player opens it, on
+  `ctx.Rebuild()`, and on every foldout click. Each run gets a **new** `ctx`, and the footer
+  is cleared before it, so set the footer in `BuildPage`.
+- The previous `ctx` dies (`IsAlive` false, for good) when the page is rebuilt, another
+  category is shown or the options screen closes. Calls on it are ignored and handles built
+  from it become inert; see [Calls on a dead context](#calls-on-a-dead-context). Take new
+  handles from each run; clear any dictionary of handles at the start of `BuildPage`.
+- Nothing you built survives a run. Keep values in your own fields, or in
+  [page state](#page-state) (runtime only; foldout open/closed lives there too).
+- Page text needs no language handling: the language is changed on the game's own General
+  page, which ends your page's context, and the next open builds your page again in the new
+  language. The category name is re-read from `GetDisplayName`.
+- A `BuildPage` that throws shows one error row ("This page failed to load. See the BepInEx
+  log.") and the exception is logged (in full the first time).
+- Main thread only. A callback from another thread must hand its work to the main thread
+  before touching the page, a handle, a toast or the banner.
+
+## Soft dependency
+
+To run without the library installed, keep every library type out of classes that load
+when it is missing, and check for it first:
 
 ```csharp
-SulfurOptionsApi.RegisterPage(new SulfurOptionsPage
+using System.Runtime.CompilerServices;
+using BepInEx;
+using BepInEx.Bootstrap;
+using Ryuka.Sulfur.NativeUI;
+
+[BepInPlugin("yourname.sulfur.example", "Example", "1.0.0")]
+[BepInDependency("ryuka.sulfur.nativeui", BepInDependency.DependencyFlags.SoftDependency)]
+public sealed class ExamplePlugin : BaseUnityPlugin
 {
-    PageId = "ryuka.example.mod",
-    DisplayName = "Example Mod",
-    SortOrder = 1000,
-    GetDisplayName = () => "Example Mod",
-    BuildPage = BuildPage
-});
+    private void Awake()
+    {
+        if (Chainloader.PluginInfos.ContainsKey("ryuka.sulfur.nativeui"))
+            NativeUiPage.Register();
+    }
+}
+
+// The only class that names library types.
+internal static class NativeUiPage
+{
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void Register()
+    {
+        SulfurOptionsApi.RegisterPage(new SulfurOptionsPage
+        {
+            PageId = "yourname.sulfur.example",
+            DisplayName = "Example",
+            BuildPage = ctx => ctx.AddSection("Example")
+        });
+    }
+}
 ```
 
-`PageId` is global across mods and compared case-insensitively. Registering
-another page with an id that is already registered replaces that page and logs
-a warning naming both.
+Do not list the library in your Thunderstore dependencies in that case.
 
-### UnregisterPage
-
-Unregisters a page.
-
-```csharp
-SulfurOptionsApi.UnregisterPage("ryuka.example.mod");
-```
-
-Call this in `OnDestroy()`.
-
----
-
-## SulfurOptionsPage
+## Pages
 
 ```csharp
 public sealed class SulfurOptionsPage
 {
     public string PageId;
     public string DisplayName;
-    public int SortOrder;
+    public int SortOrder = 1000;
     public Func<string> GetDisplayName;
     public Action<SulfurOptionsContext> BuildPage;
 }
+
+static void SulfurOptionsApi.RegisterPage(SulfurOptionsPage page);
+static void SulfurOptionsApi.UnregisterPage(string pageId);
+static IReadOnlyList<SulfurOptionsPage> SulfurOptionsApi.Pages { get; }
 ```
-
-### PageId
-
-Stable unique id.
-
-Recommended format:
-
-```text
-author.game.mod
-```
-
-Example:
-
-```text
-ryuka.sulfur.config
-```
-
-### DisplayName
-
-Fallback display name.
-
-### SortOrder
-
-Controls custom page ordering.
-
-### GetDisplayName
-
-Optional dynamic display name provider. Use this for localization.
-
-### BuildPage
-
-Called when the page is built or rebuilt.
-
----
-
-## SulfurOptionsContext
-
-A page builder context.
-
-### Important properties
-
-```csharp
-OptionsScreen OptionsScreen { get; }
-RectTransform OptionsContainer { get; }
-string PageId { get; }
-bool IsAlive { get; }
-```
-
-### IsAlive
-
-```csharp
-if (ctx.IsAlive)
-    ctx.SetFooterStatus("Saved.");
-```
-
-True while this context's page is the page on screen. Every build of a page
-(opening it, `ctx.Rebuild()`, a foldout click) gets a new context, and the old
-one stops being alive for good when the page is rebuilt, another category is
-shown, or the options screen is hidden.
-
-On a context that is no longer alive:
-
-- `Rebuild`, `SetFooter`, `SetFooterStatus` and `ClearFooter` do nothing.
-- `Add*` / `BeginThemedGroup` / foldouts add nothing and log one warning per
-  context. Methods that return a row return `null`; `AddTextRow` and `AddList`
-  return an inert handle.
-- `SulfurListHandle.Update` / `Clear` of a list built by it do nothing.
-
-Keep using the context passed to the current `BuildPage` call. A callback that
-can run after its page went away (timer, network event, async result) should
-check `IsAlive` first, or go through a handle.
-
-### Rebuild
-
-```csharp
-ctx.Rebuild();
-```
-
-Rebuilds the whole current custom page. Does nothing when the context is no
-longer alive or the options screen is not shown. The scroll position and the
-input mode are kept: a keyboard/gamepad user keeps the selected row, a mouse
-user gets no row selection. Button rows (`AddButtonRow`) keep the button that
-had keyboard/gamepad focus inside the row (see
-[Keyboard and gamepad navigation](#keyboard-and-gamepad-navigation)).
-
-Do not use this for ordinary value changes. It is expensive.
-
-Use only for:
-
-- filter changed
-- filter cleared
-- manual refresh
-- Apply / Save
-- major structure changes
-
-### SetFooter
-
-```csharp
-ctx.SetFooter(
-    leftText: "Entries: 164 | Pending: 0",
-    statusText: "Ready. Changes are not saved until you click Apply.",
-    primaryButtonText: "Apply",
-    onPrimaryPressed: Apply);
-```
-
-Sets footer text and primary button.
-
-### SetFooterStatus
-
-```csharp
-ctx.SetFooterStatus("Pending change: EnableMod");
-```
-
-Updates only footer status text.
-
-Use this for light updates.
-
----
-
-## Themed Groups
-
-### BeginThemedGroup
-
-```csharp
-using (ctx.BeginThemedGroup("section.content.General"))
-{
-    ctx.AddBadgeRow("Entries: 3", "Unchanged");
-    DrawEntry(ctx, entry1);
-    DrawEntry(ctx, entry2);
-}
-```
-
-Creates a scoped section content group.
-
-All rows created inside the scope are added to the themed group.
-
-Use this to visually show where a section's contents begin and end.
-
----
-
-## Basic UI methods
-
-### AddSection
-
-```csharp
-ctx.AddSection("General");
-```
-
-Adds a simple section header.
-
-### AddDescription
-
-```csharp
-ctx.AddDescription("Description text.");
-```
-
-Adds description text. Returns `null` (the return type is `OptionsScreenOption`
-for binary compatibility; the row is not a native option row). The same holds
-for `AddReadonlyText`.
-
-A description that wraps (or contains line breaks) makes its row taller by the
-extra lines, keeping the single-line padding, so it never runs into the row
-below; a single-line description keeps the row's usual height. The same applies
-to message lines (`AddMessage` / `AddWarning` / `AddError` / `AddSuccess`, a
-setting row's message line, also after `SulfurSettingHandle.SetMessage`) and to
-`AddTextRow` / `SulfurTextHandle.SetText`. Message and text rows do not wrap
-outside indented setting rows (long text is cut with "…"), so there only explicit
-line breaks add lines.
-
-### AddWarning
-
-```csharp
-ctx.AddWarning("No config entries match the current filters.");
-```
-
-Adds warning text.
-
-### AddBadgeRow
-
-```csharp
-ctx.AddBadgeRow("Entries: 3", "Pending: 1");
-```
-
-Adds a compact row of badges. To change the badges later without a rebuild, use
-`AddBadgeRowEx` (see [AddBadgeRowEx → SulfurBadgeRowHandle](#addbadgerowex--sulfurbadgerowhandle)).
-
-Each badge is at least 100px wide and grows to fit its text, measured with its real
-font, so translated and CJK text is not cut off; text beyond 240px is ellipsised.
-When the badges don't fit on one line the row wraps onto further lines and grows;
-the next row moves down. Width and wrapping follow text changes automatically
-(`SetBadge`, `SulfurSettingHandle.SetDirty`, a language change).
-
-### AddSmallButton
-
-```csharp
-ctx.AddSmallButton("Refresh", () =>
-{
-    needsScan = true;
-    ctx.Rebuild();
-});
-```
-
-Adds a small native-style button row. Each call creates its own full-width
-row and the button is right-aligned.
-
-The button sizes itself to its label (auto-size range 96–180px). For a wider
-button — e.g. a long label that would otherwise be clipped — pass an explicit
-width via the third argument:
-
-```csharp
-ctx.AddSmallButton("Open-source repo", () => OpenUrl(repo), 260f);
-```
-
-(Before 0.10.1 this width was ignored and every small button rendered at a
-fixed 120px, ellipsising labels longer than ~10 characters.)
-
-### AddButtonRow
-
-```csharp
-ctx.AddButtonRow(
-    new SulfurButton("Save", () => Save()),
-    new SulfurButton("Reset", () => Reset()),
-    new SulfurButton("Cancel", () => Close()));
-```
-
-Lays several small buttons out left-to-right inside a single row (left
-aligned), instead of one stacked row per button. Use this when you want a
-compact button group on one line. Each `SulfurButton` is `(label, onPressed)`,
-with an optional third `minWidth` argument to pin a fixed button width:
-
-```csharp
-new SulfurButton("OK", () => Confirm(), 120f);
-```
-
-Empty/whitespace labels are skipped. For a single button, prefer
-`AddSmallButton`.
-
-`AddButtonRow` returns `IReadOnlyList<SulfurButtonHandle>` (one per button) so you
-can change a button after building — see [Live-update handles](#live-update-handles).
-
-### AddSpacer
-
-```csharp
-ctx.AddSpacer(12f);
-```
-
-Adds vertical spacing.
-
----
-
-## Live-update handles
-
-Most rows are built once and are static; to change a page **while it is open**
-(without `ctx.Rebuild()`), use the handle-returning builders. They mirror the
-existing `SulfurSettingHandle` for setting rows.
-
-### AddTextRow → SulfurTextHandle
-
-```csharp
-SulfurTextHandle status = ctx.AddTextRow("● Not connected");
-// later, e.g. from an event or timer:
-status.SetText("● Connected to 1.2.3.4");
-status.SetColor(Color.green);
-status.SetVisible(true);
-```
-
-A plain, full-opacity text row (unlike `AddDescription`, which is dimmed and
-prefixed). Handle: `SetText` / `SetColor` / `SetVisible`. Good for status lines,
-error/reason messages, and read-only values that change at runtime.
-
-### AddButtonRow → SulfurButtonHandle
-
-```csharp
-var buttons = ctx.AddButtonRow(
-    new SulfurButton("Create game", OnCreate),
-    new SulfurButton("Join game", OnJoin));
-
-buttons[1].SetInteractable(false);   // disable Join while hosting
-buttons[0].SetLabel("Hosting…");
-```
-
-Each handle: `SetLabel` / `SetInteractable` / `SetVisible`. A disabled button is
-greyed (background + label).
-
-### AddBadgeRowEx → SulfurBadgeRowHandle
-
-```csharp
-SulfurBadgeRowHandle AddBadgeRowEx(params string[] badges);
-SulfurBadgeRowHandle AddBadgeRowEx(IReadOnlyList<string> badges);
-
-// SulfurOptionsFoldoutExtensions: the *WithBadges foldouts, handing out their badge row
-bool AddFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, IReadOnlyList<string> badges, out SulfurBadgeRowHandle badgeRow);
-bool AddPluginFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, IReadOnlyList<string> badges, out SulfurBadgeRowHandle badgeRow);
-bool AddSectionFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, IReadOnlyList<string> badges, out SulfurBadgeRowHandle badgeRow);
-```
-
-The same badge row as `AddBadgeRow` / the existing `*FoldoutWithBadges` calls,
-returned as a handle:
 
 | Member | |
 |---|---|
-| `IsAlive` | row exists and its page is on screen |
-| `BadgeCount` | badges shown now |
-| `SetBadges(params string[])`, `SetBadges(IReadOnlyList<string>)` | replaces all badges; `false` when the row is gone |
-| `SetBadge(int index, string text)` | changes one badge's text; `false` when gone, out of range or `text` empty |
-| `SetVisible(bool)` | shows / hides the row |
+| `PageId` | Required, global across mods, case-insensitive. Use your plugin GUID. Registering an id again replaces that page and logs a warning naming both. |
+| `DisplayName` | Category name when `GetDisplayName` is null or returns empty; `PageId` when this is empty too. |
+| `GetDisplayName` | Called whenever the category label is drawn (also after a language change). Return localized text here. |
+| `SortOrder` | Pages are sorted ascending, then by `DisplayName`. |
+| `BuildPage` | Required. See [Page lifecycle](#page-lifecycle). |
 
-Badges look as `AddBadgeRow` draws them: the text as given (trimmed, empty
-entries skipped; nothing is translated), all badges in the same colours. They
-are not navigation stops, and the row keeps its built size and place. A row
-without badges is hidden (it takes no space): with no badges at build time the
-row is still created, hidden, so `SetBadges` can show it later; `SetBadges()`
-with nothing hides it again.
+`RegisterPage` throws `ArgumentNullException` for a null page and `ArgumentException` when
+`PageId` or `BuildPage` is missing. Call `UnregisterPage` in `OnDestroy`.
 
-The foldout overloads take the badges as a list or array before the `out`
-parameter (`params` must be last); existing calls keep binding to the original
-`params string[]` overloads, which still return only the expanded state.
-
-Example: a config editor shows "Pending: N" on each plugin header and updates it
-after an edit, without rebuilding the page:
+## Context, rebuild and footer
 
 ```csharp
-readonly Dictionary<string, SulfurBadgeRowHandle> pluginBadges = new Dictionary<string, SulfurBadgeRowHandle>();
+OptionsScreen OptionsScreen { get; }
+RectTransform OptionsContainer { get; }   // where rows go now (inside a themed group or list: that container)
+string PageId { get; }
+bool IsAlive { get; }
 
-void DrawPlugin(SulfurOptionsContext ctx, PluginView plugin)
-{
-    SulfurBadgeRowHandle badges;
-    bool expanded = ctx.AddPluginFoldoutWithBadges(
-        "plugin." + plugin.Guid,
-        plugin.DisplayName,
-        false,
-        false,
-        new[] { "Entries: " + plugin.EntryCount, PendingBadge(plugin.PendingCount) },
-        out badges);
-
-    pluginBadges[plugin.Guid] = badges;
-
-    if (expanded)
-        DrawEntries(ctx, plugin);
-}
-
-// Called from an entry row's onChanged:
-void OnDraftChanged(PluginView plugin)
-{
-    SulfurBadgeRowHandle badges;
-    if (pluginBadges.TryGetValue(plugin.Guid, out badges) && badges.IsAlive)
-        badges.SetBadge(1, PendingBadge(plugin.PendingCount));   // or SetBadges(...) for all
-}
-
-static string PendingBadge(int count)
-{
-    return count > 0 ? "Pending: " + count : "Unchanged";
-}
+void Rebuild();
+void SetFooter(string leftText, string statusText, string primaryButtonText, Action onPrimaryPressed);
+void SetFooterStatus(string statusText);
+void ClearFooter();
 ```
 
-Clear the dictionary at the start of each `BuildPage`: handles from an earlier
-build are not alive.
+- `Rebuild()` runs `BuildPage` again with a new context; it keeps the scroll position, the
+  selected row and each button row's focused button. It is expensive on large pages: use it
+  for structure changes (filter applied, refresh, Apply), not for value changes.
+- `SetFooter` shows a fixed bar under the page: left summary, status text, primary button.
+  An empty `primaryButtonText` shows "Apply" in the player's language. `SetFooterStatus`
+  changes only the status text; use it for light feedback. `ClearFooter` hides the bar. The
+  footer never shows on the game's own categories.
+- `OptionsScreen` and `OptionsContainer` expose game/Unity objects for special cases; rows
+  you add to them yourself are not part of the library's navigation.
 
-### AddList → SulfurListHandle
+## Static rows
 
 ```csharp
-SulfurListHandle players = ctx.AddList();
+void AddSection(string label);                                   // bold header with a rule; empty label adds nothing
+OptionsScreenOption AddDescription(string text);                 // dimmed, "— " prefixed, wraps; returns null
+OptionsScreenOption AddReadonlyText(string label, string value); // description "label: value"; returns null
+void AddMessage(string text, SulfurMessageKind kind);
+void AddWarning(string text);                                    // AddMessage(text, Warning)
+void AddError(string text);                                      // AddMessage(text, Error)
+void AddSuccess(string text);                                    // AddMessage(text, Success)
+OptionsScreenOption AddInfo(string label);                       // the game's info row; a navigation stop
+void AddSpacer(float height = 20f);
 
-void RefreshPlayers()
-{
-    players.Update(list =>
-    {
-        list.AddTextRow("Alice — 24 ms");
-        list.AddTextRow("Bob — 31 ms");
-        list.AddButtonRow(new SulfurButton("Kick Bob", () => Kick("Bob")));
-    });
-}
+public enum SulfurMessageKind { Info, Warning, Error, Success }
 ```
 
-A refreshable section. `Update(build)` clears the list and re-runs `build` with
-the context redirected into the list, so you compose rows with the normal `Add*`
-API. Also `Clear()` and `SetVisible(bool)`. Good for live tables (player + ping +
-per-row actions) refreshed on a timer or network event.
+Message rows have a tinted background and a localized prefix ("WARNING: ", "ERROR: ", "OK: ";
+none for `Info`); they do not wrap, only explicit line breaks add lines. Empty text adds
+nothing for descriptions and messages. Descriptions grow with their wrapped text.
 
-### AddToggleRow / AddSliderRow / AddCycleRow → native row handles
+## Native rows and their handles
 
 ```csharp
 SulfurToggleHandle AddToggleRow(string label, bool value, Action<bool> onChanged);
@@ -437,249 +198,271 @@ SulfurCycleHandle AddCycleRow(string label, IReadOnlyList<string> values, int cu
 SulfurCycleHandle AddCycleRow(string label, string description, IReadOnlyList<string> values, int currentIndex, Action<int, string> onChanged);
 ```
 
-The same native rows as `AddToggle` / `AddSlider` / `AddCycle` (those keep
-returning `OptionsScreenOption`), returned as a handle so the page never has to
-reach into the game's private fields:
+Older `AddToggle`, `AddSlider`, `AddCycle` take the same parameters, build the same rows
+and return `OptionsScreenOption` instead of a handle.
 
 | Member | Toggle | Slider | Cycle |
 |---|---|---|---|
 | `IsAlive` | row exists and its page is on screen | same | same |
 | value | `bool Value` | `float Value` | `int Index`, `string Value` |
 | set without `onChanged` | `SetValueWithoutNotify(bool)` | `SetValueWithoutNotify(float)` (clamped, not snapped) | `SetIndexWithoutNotify(int)` (clamped) |
-| `SetLocked(bool)`, `IsLocked` | yes | yes | yes |
-| `SetVisible(bool)` (row + its description) | yes | yes | yes |
+| lock | `SetLocked(bool)`, `IsLocked` | same | same |
+| `SetVisible(bool)` (row and its description) | yes | yes | yes |
 | `SetLabel(string)` | yes | yes | yes |
 
-`SetLocked(true)` dims the whole row uniformly (CanvasGroup alpha × 0.45),
-blocks mouse input, and turns keyboard/gamepad Use (toggle) and left/right
-(slider, cycle) into no-ops; a value change that still reaches a locked row is
-undone without calling `onChanged`. It never touches the label colour (the
-game's own `OptionsScreenOption.SetLocked` recolours the label with colours
-that are transparent on library-built rows, so the label disappears).
-`SetValueWithoutNotify` keeps working while locked.
+- `SetLocked(true)` dims the row, blocks mouse input and makes Use / left-right do nothing;
+  `SetValueWithoutNotify` still works. Do not call the game's `OptionsScreenOption.SetLocked`
+  on library rows: it makes their label invisible.
+- `AddSliderRow` snaps mouse drags to `step` (when `step > 0`) and calls `onChanged` only
+  when the snapped value changes. `AddSlider` reports every drag value.
+- A cycle with no values shows one empty value; `currentIndex` is clamped.
+- Handles survive hiding and showing the row. After a rebuild they are inert (`IsAlive`
+  false, getters return defaults).
 
-`AddSliderRow` also snaps **mouse drags** to `step` (when `step > 0`), the way
-left/right already moves by `step`, and calls `onChanged` only when the snapped
-value changes. `AddSlider` is unchanged (drags report every value).
-
-Handles stay valid while the row is hidden and shown again. After the page is
-closed or rebuilt, `IsAlive` is false and the members do nothing useful; take
-the new handle from the next `BuildPage`.
-
-Example: a host-authoritative session setting. The host edits it; on a client
-the row is locked and mirrors the host's value without saving it as the
-client's own preference:
+Example: a host-owned session setting, locked on clients, updated from a session event:
 
 ```csharp
-SulfurToggleHandle friendlyFire;
+private SulfurToggleHandle friendlyFire;
 
-public void BuildPage(SulfurOptionsContext ctx)
+private void BuildPage(SulfurOptionsContext ctx)
 {
-    friendlyFire = ctx.AddToggleRow(
-        "Friendly fire",
-        "Set by the host for the whole session.",
-        config.FriendlyFire,
-        v => config.FriendlyFire = v);   // only a host can change it
-
+    friendlyFire = ctx.AddToggleRow("Friendly fire", "Set by the host for the whole session.",
+        settings.FriendlyFire, v => settings.FriendlyFire = v);
     ApplySessionRole();
 }
 
-// Called from the page's timer / a session event:
-void ApplySessionRole()
+private void ApplySessionRole()   // also called from the session's events
 {
     if (friendlyFire == null || !friendlyFire.IsAlive)
         return;
 
-    bool isClient = session.IsClient;
-    friendlyFire.SetLocked(isClient);
-    friendlyFire.SetValueWithoutNotify(isClient ? session.FriendlyFire : config.FriendlyFire);
+    friendlyFire.SetLocked(session.IsClient);
+    friendlyFire.SetValueWithoutNotify(session.IsClient ? session.FriendlyFire : settings.FriendlyFire);
 }
 ```
 
----
+## Buttons
 
 ```csharp
-ctx.AddSpacer(12f);
+IReadOnlyList<SulfurButtonHandle> AddButtonRow(params SulfurButton[] buttons);
+IReadOnlyList<SulfurButtonHandle> AddButtonRow(IReadOnlyList<SulfurButton> buttons);
+void AddSmallButton(string label, Action onPressed);
+void AddSmallButton(string label, Action onPressed, float minWidth);
+void AddDefaultButton(Action onPressed);                          // small button labelled "Default" (localized)
+OptionsScreenOption AddButton(string label, Action onPressed);    // the game's full-width button row
+OptionsScreenOption AddButton(string label, string description, Action onPressed);
+
+public struct SulfurButton
+{
+    public string Label;
+    public Action OnPressed;
+    public float MinWidth;                                         // 0 = size from the label
+    public SulfurButton(string label, Action onPressed);
+    public SulfurButton(string label, Action onPressed, float minWidth);
+}
 ```
 
-Adds vertical spacing.
+- `AddButtonRow` puts the buttons left to right in one row and returns one handle per
+  button **that was built**: buttons with an empty label are skipped, and a dead context or
+  a row with no labels returns an empty list. Check `Count` before indexing.
+- `AddSmallButton` makes its own right-aligned row. An empty label shows "Default".
+- Button width follows the label (96–180px) unless `minWidth` / `MinWidth` is set.
+- `SulfurButtonHandle`: `SetLabel(string)`, `SetInteractable(bool)` (a disabled button is
+  greyed, label included), `SetVisible(bool)`. No `IsAlive`; calls after a rebuild do
+  nothing.
 
----
+```csharp
+IReadOnlyList<SulfurButtonHandle> buttons = ctx.AddButtonRow(
+    new SulfurButton("Create game", OnCreate),
+    new SulfurButton("Join game", OnJoin));
+
+if (buttons.Count == 2)
+    buttons[1].SetInteractable(!isHosting);
+```
+
+## Text rows and lists
+
+```csharp
+SulfurTextHandle AddTextRow(string text);
+SulfurListHandle AddList();
+```
+
+- `AddTextRow`: full-opacity text, no prefix, cut with "…" when too long; explicit line
+  breaks grow the row. Handle: `SetText(string)`, `SetColor(Color)`, `SetVisible(bool)`; no
+  `IsAlive`, calls after a rebuild do nothing.
+- `AddList`: an empty block that refreshes in place. `Update(Action<SulfurOptionsContext>
+  build)` removes its rows and runs `build` with the same context writing into the list, so
+  you use the normal `Add*` calls. Also `Clear()` and `SetVisible(bool)`. `Update` and
+  `Clear` do nothing once the page is gone, so a timer can keep calling them. Selection and
+  button-row focus are kept by position.
+
+```csharp
+private SulfurListHandle players;
+
+private void BuildPage(SulfurOptionsContext ctx)
+{
+    ctx.AddSection("Players");
+    players = ctx.AddList();
+    RefreshPlayers();
+}
+
+private void RefreshPlayers()   // also from a timer or a network event, on the main thread
+{
+    if (players == null)
+        return;
+
+    players.Update(list =>
+    {
+        foreach (PlayerInfo p in session.Players)
+        {
+            PlayerInfo player = p;
+            list.AddTextRow(player.Name + " - " + player.Ping + " ms");
+            list.AddButtonRow(new SulfurButton("Kick " + player.Name, () => session.Kick(player)));
+        }
+    });
+}
+```
+
+## Badge rows
+
+```csharp
+void AddBadgeRow(params string[] badges);
+void AddBadgeRow(IReadOnlyList<string> badges);
+SulfurBadgeRowHandle AddBadgeRowEx(params string[] badges);
+SulfurBadgeRowHandle AddBadgeRowEx(IReadOnlyList<string> badges);
+```
+
+Badges show their text as given (trimmed; empty entries skipped; not translated). Each is at
+least 100px wide and grows to its text up to 240px (longer text gets "…"); a row that does
+not fit wraps onto more lines. Badges are not navigation stops. `AddBadgeRow` with no
+non-empty badge adds nothing. `AddBadgeRowEx` always builds the row and shows it exactly
+while it has at least one badge and `SetVisible(false)` is not in effect; otherwise it is
+hidden and takes no space.
+
+| `SulfurBadgeRowHandle` | |
+|---|---|
+| `IsAlive` | row exists and its page is on screen |
+| `BadgeCount` | badges shown now |
+| `bool SetBadges(params string[])`, `bool SetBadges(IReadOnlyList<string>)` | replaces all; none hides the row; `false` when gone |
+| `bool SetBadge(int index, string text)` | one badge; `false` when gone, out of range or `text` empty |
+| `SetVisible(bool)` | a row without badges stays hidden |
 
 ## Text and number inputs
 
-### Stacked inputs (label above input)
-
 ```csharp
-ctx.AddTextInput("Hostname", host, value => host = value);
-ctx.AddNumberInput("Port", port, 0f, 65535f, 0, value => port = value);
-```
-
-The label is placed on its own row above a full-width input box. This is the
-original layout and is unchanged.
-
-### Number precision: float and double
-
-The original number inputs (`AddNumberInput`, `AddInlineNumberInput`,
-`AddSettingNumber`, `AddSettingNumberEx` with `float` arguments) parse, clamp,
-round and format in `float`. A float holds about 7 significant digits, so
-larger or more precise values (`123456789`, `0.123456789`, a `double` config
-value) are shown and reported rounded, and a double setting cannot be edited
-exactly. Their behaviour is unchanged.
-
-For those values use the `double` overloads (since 0.11.0). They parse with
-`double` and the invariant culture (a `,` typed as decimal separator is read as
-`.`), clamp to `[min, max]`, round to `decimals` (ties to even, like the float
-version; at most 15 decimals) and format without a thousands separator. The
-text shows up to 15 significant digits, which a double holds exactly:
-
-```csharp
-OptionsScreenOption AddNumberInput(string label, double value, double min, double max, int decimals, Action<double> onChanged);
-OptionsScreenOption AddNumberInput(string label, string description, double value, double min, double max, int decimals, Action<double> onChanged);
+// Label and box on one line; returns the field. Same labelWidth on several rows aligns the boxes.
+TMP_InputField AddInlineTextInput(string label, string value, Action<string> onChanged, float labelWidth = 160f, bool password = false);
+TMP_InputField AddInlineNumberInput(string label, float value, float min, float max, int decimals, Action<float> onChanged, float labelWidth = 160f);
 TMP_InputField AddInlineNumberInput(string label, double value, double min, double max, int decimals, Action<double> onChanged, float labelWidth = 160f);
-
-// SulfurOptionsSettingRows
-OptionsScreenOption AddSettingNumber(this SulfurOptionsContext ctx, SulfurSettingRow row, double value, double min, double max, int decimals, Action<double> onChanged);
-OptionsScreenOption AddSettingNumberEx(this SulfurOptionsContext ctx, SulfurSettingRow row, double value, double min, double max, int decimals, Action<double, SulfurSettingHandle> onChanged, out SulfurSettingHandle handle);
 ```
 
-They are overloads, not new names: a call that compiled before still picks the
-float version (with `float`, `int` or other integer arguments the float
-parameters are the better match, and a lambda `v => ...` fits both delegates
-equally), so existing mods are unaffected. Pass a `double` value (or `double`
-bounds) to get the double version:
+Older `AddTextInput(label, [description,] value, onChanged)` and `AddNumberInput(label,
+[description,] value, min, max, decimals, onChanged)` (float and double) put the label on
+its own row above a full-width box and return that label row, not the field. With a handle,
+the same layout is `AddSettingTextEx` / `AddSettingNumberEx`.
 
-```csharp
-ctx.AddNumberInput("Seed", seed, 0d, 1e15, 0, v => seed = v);           // double
-ctx.AddNumberInput("Port", port, 0f, 65535f, 0, v => port = (int)v);     // float, as before
-```
-
-### Inline inputs (label and input on the same line)
-
-```csharp
-TMP_InputField AddInlineTextInput(
-    string label,
-    string value,
-    Action<string> onChanged,
-    float labelWidth = 160f,
-    bool password = false);
-
-TMP_InputField AddInlineNumberInput(
-    string label,
-    float value,
-    float min,
-    float max,
-    int decimals,
-    Action<float> onChanged,
-    float labelWidth = 160f);
-```
-
-Places the label and the input field on a single row, matching the vanilla
-Options layout. Pass the same `labelWidth` to several rows so every input box
-starts at the same horizontal position. Increase `labelWidth` to give longer
-or CJK labels more room.
-
-`password: true` masks the field (TMP `ContentType.Password`).
-
-Both methods return the created `TMP_InputField`, so the caller can read or set
-its value later.
+- Text inputs call `onChanged` on **every keystroke**. Number inputs call it when editing
+  ends, with the value parsed, clamped to `[min, max]` and rounded to `decimals`;
+  unparseable input reverts to the last accepted value.
+- `float` overloads hold about 7 significant digits. For larger or more precise values pass
+  `double` arguments (e.g. `0d, 1e15`): parsed with the invariant culture (`,` read as
+  `.`), up to 15 decimals and 15 significant digits. Calls with `float` or integer
+  arguments keep binding to the `float` overloads.
+- `password: true` masks the field.
 
 ```csharp
 ctx.AddInlineTextInput("Hostname", host, v => host = v);
-ctx.AddInlineTextInput("Port",     port, v => port = v);
-ctx.AddInlineTextInput("Slot",     slot, v => slot = v);
-ctx.AddInlineTextInput("Password", pass, v => pass = v, password: true);
-
+ctx.AddInlineTextInput("Port", port, v => port = v);
+ctx.AddInlineTextInput("Password", password, v => password = v, password: true);
 ctx.AddInlineNumberInput("Timeout", timeout, 0f, 60f, 1, v => timeout = v);
+ctx.AddInlineNumberInput("Seed", seed, 0d, 1e15, 0, v => seed = v);   // double
 ```
 
-`AddInlineNumberInput` also has a `double` overload; see
-[Number precision](#number-precision-float-and-double).
+## Foldouts
 
----
-
-## Setting row APIs
-
-Old API:
+Extension methods in `SulfurOptionsFoldoutExtensions`. Each adds a clickable header and
+returns whether it is open; add the content only when it returns `true`. A click stores the
+new state and rebuilds the page. Mind the names: `AddFoldout` is Section style, but
+`AddFoldoutWithBadges` is Plugin style (with the "MOD" tag); use
+`AddSectionFoldoutWithBadges` for a section header with badges.
 
 ```csharp
-ctx.AddSettingToggle(row, value, onChanged);
-ctx.AddSettingText(row, value, onChanged);
-ctx.AddSettingNumber(row, value, min, max, decimals, onChanged);
-ctx.AddSettingCycle(row, values, currentIndex, onChanged);
+bool AddFoldout(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded);
+bool AddFoldout(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded);
+bool AddFoldout(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, string description);
+bool AddPluginFoldout(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded);
+bool AddSectionFoldout(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded);
+
+// Header followed by a badge row
+bool AddFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, params string[] badges);
+bool AddPluginFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, params string[] badges);
+bool AddSectionFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, params string[] badges);
+bool AddFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, IReadOnlyList<string> badges, out SulfurBadgeRowHandle badgeRow);
+bool AddPluginFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, IReadOnlyList<string> badges, out SulfurBadgeRowHandle badgeRow);
+bool AddSectionFoldoutWithBadges(this SulfurOptionsContext ctx, string key, string label, bool defaultExpanded, bool forceExpanded, IReadOnlyList<string> badges, out SulfurBadgeRowHandle badgeRow);
 ```
 
-These preserve compatibility but do not return a row handle.
-
-Recommended high-performance API:
-
-```csharp
-ctx.AddSettingToggleEx(row, value, onChanged, out handle);
-ctx.AddSettingTextEx(row, value, onChanged, out handle);
-ctx.AddSettingNumberEx(row, value, min, max, decimals, onChanged, out handle);
-ctx.AddSettingCycleEx(row, values, currentIndex, onChanged, out handle);
-```
-
-Use the `Ex` methods for large pages and config editors.
-
-`AddSettingNumber` / `AddSettingNumberEx` take `float` or `double` values; see
-[Number precision](#number-precision-float-and-double).
-
-A row built with an `Ex` method always has its message line and, when
-`OnDefault` is set, its Default button, also when they start hidden (empty
-`Message`, `ShowDefaultButton = false`), so the handle can show them later. A
-hidden part is an inactive row: it takes no space and is no navigation stop.
-(The non-`Ex` methods are built the same way; they just do not hand out the
-handle.) `AddSettingMeta` on its own builds only what is visible, as before.
-
----
-
-## Keyboard and gamepad navigation
-
-The options screen turns Unity's EventSystem navigation off, so arrow keys,
-Enter/Space and Escape (and the gamepad equivalents) reach only the game's own
-option rows. Every interactive library widget is part of that navigation, in
-screen order, with the game's own selection highlight (the white row border):
-
-| Widget | Use (Enter / A) | Left / right |
+| Style | Methods | Look |
 |---|---|---|
-| foldout header (`AddFoldout*`) | toggles it; the same header stays selected (nothing while `forceExpanded`) | — |
-| `AddSmallButton`, `AddDefaultButton`, setting-row Default button | presses it (if interactable) | — |
-| `AddButtonRow` | presses the focused button | moves the focus between the buttons |
-| `AddTextInput` / `AddNumberInput` (and the setting text/number rows) | starts typing | — |
-| `AddInlineTextInput` / `AddInlineNumberInput` | starts typing | — |
-| footer primary button (`SetFooter`) | presses it (if it has an action) | — |
+| Plugin | `AddPluginFoldout*`, `AddFoldoutWithBadges` | 66px, large bold label, accent bar, "MOD" tag on the right |
+| Section | `AddFoldout`, `AddSectionFoldout*` | 48px, indented 32px |
 
-- A **button row** is one navigation stop. The focused button carries a thin
-  white frame while the row is selected; hidden and non-interactable buttons are
-  skipped, and there is no wrap-around. A rebuild keeps the focus of every
-  button row: `ctx.Rebuild()` (also from a foldout click) and
-  `SulfurListHandle.Update` give each rebuilt button row the focus of the row
-  that sat at the same position in the page's navigation order before — the
-  same key that keeps the selected row — clamped to the new row's buttons (a
-  hidden or disabled button moves it to the nearest usable one). When rows
-  above it appear or disappear in that rebuild, the position belongs to another
-  row, and so does the remembered focus, just as for the selected row. Opening
-  the page afresh starts every row on its first button.
-- A **forced-open foldout** (`forceExpanded: true`) stays a navigation stop and
-  looks the same, but clicking it or Use does nothing (no hover/press tint
-  either); its stored open/closed state is left as the player set it.
-- In a **text input**, typing, the caret keys and Enter/Escape belong to the
-  field. Enter or Escape ends editing and returns to row navigation with the same
-  row selected. Starting to type with Use selects the whole value of a number
-  input (the first key typed replaces it) and puts the caret at the end of a text
-  input; a mouse click still puts the caret where the field was clicked. A stacked input is one stop: the row with the box (its label row
-  above is not a separate stop any more).
-- The **footer** button is always the last stop of the page.
-- Rows hidden with `SetVisible(false)`, `SetActive(false)`, a collapsed foldout
-  or a hidden list are skipped.
-- Mouse behaviour and the look of unselected rows are unchanged. Hovering one of
-  these widgets with the mouse shows the widget's own hover tint, not the game's
-  border.
+- The `description` overload adds a description row under the header.
+- `key` identifies the foldout within the page (stored as page state `"foldout." + key`;
+  `label` is used when `key` is null). The state lasts until the game closes.
+- `forceExpanded: true` shows it open whatever the stored state (e.g. while a search filter
+  is active); clicking it does nothing and the stored state is kept for later.
+- The badge row sits directly under the header and stays visible while the foldout is
+  collapsed. The `params string[]` overloads add it only when there are badges; the `out`
+  overloads always build it, as `AddBadgeRowEx` does.
 
----
+## Themed groups
 
-## SulfurSettingRow
+```csharp
+IDisposable BeginThemedGroup(string name);
+IDisposable BeginThemedGroup(string name, Color themeColor, float indentPixels);
+```
+
+Rows added inside the `using` block go into a framed block: a thin border in the theme
+colour around an almost transparent background. `name` names the GameObject. The 1-argument
+overload uses the options text colour and 32px indent; the 3-argument one sets both. Always
+dispose the scope (use `using`); on a dead context it is an empty scope.
+
+```csharp
+if (ctx.AddSectionFoldout("section.General", "General", true, false))
+{
+    using (ctx.BeginThemedGroup("section.General.content"))
+    {
+        ctx.AddBadgeRow("Entries: 2");
+        ctx.AddToggleRow("Enabled", enabled, v => enabled = v);
+        ctx.AddSliderRow("Volume", volume, 0f, 1f, 0.05f, v => volume = v);
+    }
+}
+```
+
+## Page state
+
+Extension methods in `SulfurOptionsStateExtensions`: a small store per page id, kept in
+memory until the game closes, shared by every context of the page (it works on a dead
+context too). For UI state such as filters and foldouts, not for settings.
+
+```csharp
+T GetState<T>(this SulfurOptionsContext ctx, string key, T defaultValue);
+void SetState<T>(this SulfurOptionsContext ctx, string key, T value);
+bool HasState(this SulfurOptionsContext ctx, string key);
+void RemoveState(this SulfurOptionsContext ctx, string key);
+void ClearPageState(this SulfurOptionsContext ctx);              // also resets every foldout of the page
+bool ToggleBoolState(this SulfurOptionsContext ctx, string key, bool defaultValue);   // returns the new value
+```
+
+Keys are case-insensitive. `GetState` returns `defaultValue` when the key is missing or the
+stored value cannot be converted to `T`.
+
+## Setting rows
+
+Extension methods in `SulfurOptionsSettingRows`. One setting row is a control, its
+description, a badge row, a message line and an optional Default button, described by a
+`SulfurSettingRow`.
 
 ```csharp
 public sealed class SulfurSettingRow
@@ -687,348 +470,259 @@ public sealed class SulfurSettingRow
     public string Label;
     public string Description;
 
-    public int IndentLevel;
-    public float IndentPixels;
-
     public bool IsDirty;
-    public bool ShowCleanBadge;
-
     public bool RequiresRestart;
     public bool LiveApply;
     public bool Advanced;
     public bool Hidden;
     public bool Dangerous;
 
-    public string DirtyText;
-    public string CleanText;
-    public string RestartRequiredText;
-    public string LiveApplyText;
-    public string AdvancedText;
-    public string HiddenText;
-    public string DangerousText;
+    public string DirtyText = "Dirty";
+    public string CleanText = "Clean";
+    public string RestartRequiredText = "Restart Required";
+    public string LiveApplyText = "Live Apply";
+    public string AdvancedText = "Advanced";
+    public string HiddenText = "Hidden";
+    public string DangerousText = "Dangerous";
 
     public string[] ExtraBadges;
 
-    public string Message;
-    public SulfurMessageKind MessageKind;
-
-    public bool ShowDefaultButton;
-    public string DefaultButtonText;
+    public bool ShowCleanBadge = true;
+    public bool ShowDefaultButton = true;
+    public string DefaultButtonText = "Default";
     public Action OnDefault;
+
+    public string Message;
+    public SulfurMessageKind MessageKind = SulfurMessageKind.Info;
+
+    public int IndentLevel = 0;
+    public float IndentPixels = 28f;
 }
 ```
 
-The text fields default to English (`"Dirty"`, `"Clean"`, `"Restart Required"`,
-`"Live Apply"`, `"Advanced"`, `"Hidden"`, `"Dangerous"`, `"Default"`). A field
-that still holds exactly its default is displayed in the player's language (the
-library's own `lang` files); any other value is displayed unchanged (assigning
-the default string itself cannot be told apart from leaving the default). `SulfurOptionsSettingRows.BuildBadges` returns the
-texts as displayed.
-
-Recommended defaults for config editors:
-
-```csharp
-SulfurSettingRow row = new SulfurSettingRow
-{
-    Label = entry.DisplayName,
-    Description = entry.Description,
-    IndentLevel = 1,
-    IsDirty = entry.IsDirty,
-
-    RequiresRestart = entry.RequiresRestart,
-    LiveApply = entry.LiveApply,
-    Advanced = entry.Advanced,
-    Hidden = entry.Hidden,
-    Dangerous = entry.Dangerous,
-
-    DirtyText = "Pending",
-    CleanText = "Unchanged",
-    RestartRequiredText = "Restart Required",
-    LiveApplyText = "Live Apply",
-    AdvancedText = "Advanced",
-    HiddenText = "Hidden",
-    DangerousText = "Dangerous",
-
-    Message = entry.IsDirty ? pendingMessage : entry.RangeText,
-    MessageKind = entry.IsDirty ? SulfurMessageKind.Warning : SulfurMessageKind.Info,
-
-    DefaultButtonText = "Default",
-    OnDefault = () => { ... }
-};
-```
-
----
-
-## SulfurSettingHandle
-
-Runtime handle for updating one setting row without rebuilding the whole page.
-
-### SetDirty
+- Badges, in order: `DirtyText` when `IsDirty`, else `CleanText` when `ShowCleanBadge`; then
+  one per true flag (`RequiresRestart` … `Dangerous`); then `ExtraBadges`.
+- A text field that still holds its English default is shown in the player's language;
+  any other value is shown as is.
+- Setting `OnDefault` adds a Default button (shown because `ShowDefaultButton` defaults to
+  `true`).
+- `IndentLevel > 0` indents every part by `IndentLevel * IndentPixels` and switches the row
+  to a compact style (smaller text; description and message wrap). `IndentPixels <= 0` counts
+  as 28.
 
 ```csharp
-handle.SetDirty(true, "Pending", "Unchanged");
+OptionsScreenOption AddSettingToggleEx(this SulfurOptionsContext ctx, SulfurSettingRow row, bool value, Action<bool, SulfurSettingHandle> onChanged, out SulfurSettingHandle handle);
+OptionsScreenOption AddSettingTextEx(this SulfurOptionsContext ctx, SulfurSettingRow row, string value, Action<string, SulfurSettingHandle> onChanged, out SulfurSettingHandle handle);
+OptionsScreenOption AddSettingNumberEx(this SulfurOptionsContext ctx, SulfurSettingRow row, float value, float min, float max, int decimals, Action<float, SulfurSettingHandle> onChanged, out SulfurSettingHandle handle);
+OptionsScreenOption AddSettingNumberEx(this SulfurOptionsContext ctx, SulfurSettingRow row, double value, double min, double max, int decimals, Action<double, SulfurSettingHandle> onChanged, out SulfurSettingHandle handle);
+OptionsScreenOption AddSettingCycleEx(this SulfurOptionsContext ctx, SulfurSettingRow row, IReadOnlyList<string> values, int currentIndex, Action<int, string, SulfurSettingHandle> onChanged, out SulfurSettingHandle handle);
+
+// No Ex equivalent
+OptionsScreenOption AddSettingEnum<TEnum>(this SulfurOptionsContext ctx, SulfurSettingRow row, TEnum value, Action<TEnum> onChanged);   // TEnum must be an enum; shows the member names
+void AddSettingMeta(this SulfurOptionsContext ctx, SulfurSettingRow row);   // badge row, message (if any), Default button (if shown)
+static List<string> SulfurOptionsSettingRows.BuildBadges(SulfurSettingRow row);   // badge texts as displayed
 ```
 
-or:
+Older `AddSettingToggle`, `AddSettingText`, `AddSettingNumber` (float and double) and
+`AddSettingCycle` build the same rows without the `out` handle; their `onChanged` gets only
+the value.
 
-```csharp
-handle.SetDirty(entry.IsDirty);
-```
+The text, number and cycle controls behave as in [inputs](#text-and-number-inputs) and
+[native rows](#native-rows-and-their-handles). For an `int` setting use the float
+`AddSettingNumberEx` with `decimals: 0` and cast the value (`(int)v`; it is already
+rounded). The `onChanged` of the `Ex` methods also
+receives the row's handle. Rows built by these methods always contain a message line and,
+with `OnDefault`, a Default button, hidden when empty or `ShowDefaultButton = false`, so the
+handle can show them later; a hidden part takes no space and is no navigation stop.
 
-### SetMessage
+| `SulfurSettingHandle` | |
+|---|---|
+| `SetDirty(bool dirty)`, `SetDirty(bool dirty, string dirtyText, string cleanText)` | rewrites the row's **first** badge with the dirty or clean text. Needs that badge to be the status badge: keep `ShowCleanBadge = true` or build with `IsDirty = true`. Only the status badge changes; flag badges and `ExtraBadges` stay as built. |
+| `SetMessage(string text, SulfurMessageKind kind)` | shows the message line; empty text hides it |
+| `SetActive(bool)` | hides / shows the whole block; an empty message line and a hidden Default button stay hidden |
+| `bool SetDefaultButtonVisible(bool)` | `false` when the row has no `OnDefault` or is gone |
+| `bool SetValueWithoutNotify(bool)` | toggle rows |
+| `bool SetValueWithoutNotify(float)`, `bool SetValueWithoutNotify(double)` | number rows: formatted with the row's decimals, not clamped; becomes the value bad input reverts to |
+| `bool SetValueWithoutNotify(string)` | text rows (`null` as `""`) |
+| `bool SetIndexWithoutNotify(int)` | cycle rows (clamped) |
 
-```csharp
-handle.SetMessage(
-    "This setting has unsaved pending changes. Click Apply to write it to cfg.",
-    SulfurMessageKind.Warning);
-
-handle.SetMessage("", SulfurMessageKind.Info);   // hides the message line
-```
-
-Every row built with an `Ex` method has a message line, also when it was built
-without a `Message` (since 0.11.0; before, `SetMessage` silently did nothing on
-such a row). An empty or whitespace text hides the line; a non-empty text shows
-it with the kind's prefix and background. A hidden line takes no space (the
-row's height is the same as a row built without a message) and is no
-navigation stop.
-
-### SetActive
-
-```csharp
-handle.SetActive(false);
-```
-
-Hides or shows every row of the setting block. Showing it again keeps a hidden
-message line (empty message) and a Default button hidden with
-`SetDefaultButtonVisible(false)` hidden.
-
-### Setting the value without a rebuild
-
-```csharp
-public bool SetValueWithoutNotify(bool value);    // AddSettingToggleEx rows
-public bool SetValueWithoutNotify(float value);   // AddSettingNumberEx rows
-public bool SetValueWithoutNotify(double value);  // AddSettingNumberEx rows
-public bool SetValueWithoutNotify(string value);  // AddSettingTextEx rows
-public bool SetIndexWithoutNotify(int index);     // AddSettingCycleEx rows
-```
-
-Shows a new value in the row's control without calling the row's `onChanged`
-(for example after a "Default" button set the draft back to its default). Each
-works only on the kind of row the handle was built for; on another kind, or
-once the row is gone (its page closed or rebuilt), it does nothing and returns
-`false`. None of them throws.
-
-- **Toggle**: sets the checkbox through the row's binding; works while the row
-  is locked.
-- **Number**: shows the value formatted with the row's `decimals`, not clamped
-  (the same as the value the row was built with), and makes it the value
-  unparseable input reverts to. Both overloads work on float and double rows;
-  a float row stores the value as `float`.
-- **Text**: sets the field's text (`null` as `""`); typing still reports
-  every change as before.
-- **Cycle**: shows the value at `index` (clamped). It has its own name so that
-  an integer literal (`handle.SetValueWithoutNotify(5)`) always means a number.
-
-### SetDefaultButtonVisible
-
-```csharp
-public bool SetDefaultButtonVisible(bool visible);
-```
-
-Shows or hides the row's Default button. The button is built whenever the row
-has an `OnDefault` action, also with `ShowDefaultButton = false` (it then starts
-hidden), so it can be shown later; returns `false` when the row has no
-`OnDefault` or is gone. A hidden button takes no space and is no navigation
-stop. If the button is hidden while it is the selected row (Use on Default),
-the next up/down moves on from its position.
-
-Example: a Default button that updates the row in place instead of rebuilding
-the page:
+The value setters return `false` on another kind of row or once the row is gone; nothing
+throws. The handle has no `IsAlive`: check `IsAlive` of the `ctx` that built it, or the
+setters' return value. Example: a Default button that updates its row without a rebuild:
 
 ```csharp
 SulfurSettingHandle handle = null;
 
-row.ShowDefaultButton = current != entry.DefaultValue;
-row.OnDefault = () =>
+SulfurSettingRow row = new SulfurSettingRow
 {
-    drafts.Set(entry, entry.DefaultValue);
-    handle.SetValueWithoutNotify(entry.DefaultBool);
-    handle.SetDirty(drafts.IsPending(entry));
-    handle.SetMessage(GetMessage(entry), SulfurMessageKind.Info);
-    handle.SetDefaultButtonVisible(false);
+    Label = "Enabled",
+    IsDirty = enabled != savedEnabled,
+    ShowDefaultButton = enabled != DefaultEnabled,
+    OnDefault = () =>
+    {
+        enabled = DefaultEnabled;
+        handle.SetValueWithoutNotify(DefaultEnabled);
+        handle.SetDirty(enabled != savedEnabled);
+        handle.SetDefaultButtonVisible(false);
+    }
 };
 
-ctx.AddSettingToggleEx(row, value, (v, h) => Commit(entry, v, h), out handle);
+ctx.AddSettingToggleEx(row, enabled, (v, h) =>
+{
+    enabled = v;
+    h.SetDirty(enabled != savedEnabled);
+    h.SetDefaultButtonVisible(enabled != DefaultEnabled);
+}, out handle);
 ```
 
----
+## Calls on a dead context
 
-## SulfurMessageKind
+A context is dead once its page was rebuilt, left or closed (`IsAlive` false). The first
+ignored call logs one warning per context.
+
+| Call | Result |
+|---|---|
+| `Rebuild`, `SetFooter`, `SetFooterStatus`, `ClearFooter` | nothing |
+| `AddSection`, `AddMessage` and friends, `AddBadgeRow`, `AddSmallButton`, `AddDefaultButton`, `AddSpacer` | nothing added |
+| `AddToggle`, `AddSlider`, `AddCycle`, `AddButton`, `AddInfo`, `AddTextInput`, `AddNumberInput`, `AddDescription`, `AddReadonlyText`, `AddSetting*` (non-`Ex`) | `null` |
+| `AddInlineTextInput`, `AddInlineNumberInput` | `null` |
+| `AddToggleRow`, `AddSliderRow`, `AddCycleRow`, `AddBadgeRowEx`, `AddTextRow`, `AddList` | an inert handle (`IsAlive` false where it exists; members do nothing) |
+| `AddButtonRow` | an empty list |
+| `AddSetting*Ex` | `null`, and an inert `SulfurSettingHandle` (setters return `false`) |
+| foldouts | no header; still return the stored (or forced) state |
+| `BeginThemedGroup` | an empty scope |
+| `GetState` / `SetState` / ... | work as usual |
+
+## Keyboard and gamepad navigation
+
+Nothing to set up: every interactive library row is reachable in screen order, and Use
+(Enter / A) presses, toggles or starts typing. A button row is one stop where left/right
+picks the button. Hidden rows and hidden or disabled buttons are skipped; the footer button
+is the last stop. A rebuild keeps the selected row and each button row's focused button, so
+a button whose action rebuilds the page stays selected.
+
+## Toasts
 
 ```csharp
-public enum SulfurMessageKind
+static void SulfurToastApi.Show(string message);
+static void SulfurToastApi.Show(string message, float durationSeconds);
+static void SulfurToastApi.Show(string title, string message);
+static void SulfurToastApi.Show(string title, string message, float durationSeconds);
+```
+
+A card slides into the top-right corner during play, holds for `durationSeconds` (default
+4 s; also for a value `<= 0`), then slides out. New toasts stack on top; at most 5 are
+shown, older ones leave early. Title in `SerifBold`, message in `SerifSemibold`, both
+following the language. Fire-and-forget: no handle, no input capture, no pause, no cursor
+change, independent of time scale. Exceptions are logged, not thrown.
+
+```csharp
+SulfurToastApi.Show("Saved.");
+SulfurToastApi.Show("Player joined", "Cousin connected to the lobby.");
+```
+
+## Popup banner
+
+```csharp
+static void SulfurPopupApi.ShowBanner(string text);
+static void SulfurPopupApi.HideBanner();
+```
+
+One banner above the screen centre, shown during play until `HideBanner`. Calling
+`ShowBanner` again replaces the text. Display only: it captures no input, does not pause
+and does not change the cursor, so key handling (e.g. "Press [Return] to enter") stays in
+your mod. Text in `SerifBold` at 34pt, following the language. `HideBanner` is safe when
+nothing is shown. Survives scene loads.
+
+## Fonts
+
+For text your mod builds itself (HUD, overlays). Library rows already use these fonts.
+
+```csharp
+public enum SulfurFontRole { RoundRegular, RoundSemibold, RoundBold, SerifRegular, SerifSemibold, SerifBold }
+
+static TMP_FontAsset SulfurFonts.Get(SulfurFontRole role);
+static void SulfurFonts.Bind(TMP_Text text, SulfurFontRole role);
+static TMP_FontAsset SulfurFonts.WithFallback(TMP_FontAsset font);
+static event Action SulfurFonts.FontsChanged;
+```
+
+| Role | The game uses it for |
+|---|---|
+| `SerifRegular` | menus, the options screen, option rows |
+| `SerifSemibold` | small HUD text, dialogue body |
+| `SerifBold` | centred HUD alerts, character titles |
+| `RoundRegular` | resource counters, "press to continue" |
+| `RoundSemibold` | button legends, rank text |
+
+- `Get`: the game's current font for the role. Until the game's fonts are loaded (or on a
+  game version without font roles) it returns TMP's default font.
+- `Bind`: sets the role's font and its material now and switches the text when the language
+  changes. Binding again replaces the role; destroyed texts drop out. Size, colour and style
+  stay yours.
+- Every font from `Get` / `Bind` carries a CJK and symbol fallback built from installed
+  system fonts, so missing glyphs render in any language. `WithFallback` attaches the same to
+  a font your mod ships (idempotent; returns the same font).
+- `FontsChanged`: after the role fonts changed; bound texts are already updated. Only
+  needed if you keep font assets yourself.
+- An unknown role value throws `ArgumentOutOfRangeException`.
+
+## Language
+
+```csharp
+static IDisposable SulfurLanguage.Follow(Action<string> onLanguage);
+static string SulfurLanguage.Code { get; }          // "en", "zh-CN", "ja", ... = lang/<code>.json
+static bool SulfurLanguage.IsReady { get; }
+static bool SulfurLanguage.IsRightToLeft { get; }   // Arabic
+static string SulfurLanguage.FixRtl(string text);
+static event Action<string> SulfurLanguage.Changed;
+```
+
+- `Follow` is for text outside the options page: HUD, overlays, strings you cache. Options
+  page text needs nothing (see [Page lifecycle](#page-lifecycle)).
+- `Follow` calls `onLanguage` with the current code at once if the language is known,
+  otherwise when it becomes known (the game sets its startup language without any event),
+  then after every change. Dispose the result to stop. Subscribe once (`Awake`) and dispose
+  in `OnDestroy`; never in `BuildPage`, which runs on every open and would stack callbacks.
+- Notifications run on the main thread after all of the game's own language handlers, so
+  text you set is not overwritten. Each callback runs in its own try/catch; exceptions are
+  logged as warnings.
+- `Code` is `"en"` until `IsReady`. `Changed` fires once when the language becomes known,
+  then on every actual change; `Follow` covers both.
+- `FixRtl` shapes right-to-left text the way the game shapes its own; other text is returned
+  unchanged. Call it once when you resolve a text, not every frame.
+
+```csharp
+private IDisposable languageFollow;
+private string hudTitle;
+
+private void Awake()
 {
-    Info,
-    Warning,
-    Error,
-    Success
+    languageFollow = SulfurLanguage.Follow(code =>
+        hudTitle = SulfurLanguage.FixRtl(SulfurLocalization.Get(PluginGuid, "hud.title", "Overlay")));
+}
+
+private void OnDestroy()
+{
+    languageFollow.Dispose();
 }
 ```
 
-Use:
+## Localization
 
 ```csharp
-SulfurMessageKind.Info
-SulfurMessageKind.Warning
-SulfurMessageKind.Error
-SulfurMessageKind.Success
+static void SulfurLocalization.LoadPluginLocalization(string pluginGuid, string pluginAssemblyLocation);
+static string SulfurLocalization.Get(string pluginGuid, string key, string fallback);
+static string SulfurLocalization.CurrentLanguageCode { get; }   // lookup language; "en" until known
+static int SulfurLocalization.LanguageVersion { get; }          // +1 on each SulfurLanguage.Changed
+static void SulfurLocalization.RefreshCurrentLanguage(bool force);   // kept for compatibility; not needed
 ```
 
----
+File layout, key format and lookup order: [LOCALIZATION.md](LOCALIZATION.md).
 
-## Localization API
+## Other public members
 
-### LoadPluginLocalization
-
-```csharp
-SulfurLocalization.LoadPluginLocalization(pluginGuid, pluginInfo.Location);
-```
-
-Loads `lang/*.json` beside the target plugin dll.
-
-### Get
-
-```csharp
-string label = SulfurLocalization.Get(
-    pluginGuid,
-    "entry.General.EnableMod.name",
-    "EnableMod");
-```
-
-Fallback is used when no translation exists.
-
----
-
-## Fonts API
-
-Fonts for text a mod builds itself, chosen the way the game chooses its own: by
-**role**, following the current language. The library's own surfaces (options rows,
-toasts, banner) use the same API.
-
-### SulfurFontRole
-
-```csharp
-SulfurFontRole.RoundRegular   // resource counters, "press to continue"
-SulfurFontRole.RoundSemibold  // button legends, rank text
-SulfurFontRole.RoundBold
-SulfurFontRole.SerifRegular   // menus, options screen, option rows
-SulfurFontRole.SerifSemibold  // small HUD text (floor info), dialogue body
-SulfurFontRole.SerifBold      // centred HUD alerts, character titles
-```
-
-The six values mirror the game's own font roles. In English the Round fonts are
-Latin-only; every font from this API carries a CJK/symbol fallback, so any role can
-show any language.
-
-### Get
-
-```csharp
-TMP_FontAsset font = SulfurFonts.Get(SulfurFontRole.SerifRegular);
-```
-
-The game's current font for the role, with glyph fallback attached. While the
-game's language assets are still loading — or on a game version without the role
-mechanism — it returns TMP's default font (also with fallback). There is no lookup
-by font name: names change between game versions and do not follow the language.
-
-### Bind
-
-```csharp
-SulfurFonts.Bind(myText, SulfurFontRole.SerifBold);
-```
-
-Sets the role's font and the font's own material now, and keeps the text on that
-role: when the player changes language, the text switches font automatically.
-Binding the same text again replaces its role. Texts are held weakly; destroyed
-texts drop out on their own. Size, colour and style stay yours.
-
-### WithFallback
-
-```csharp
-TMP_FontAsset own = SulfurFonts.WithFallback(myBundledFont);
-```
-
-Attaches the library's CJK and symbol fallback to a font your mod ships, so it
-renders missing glyphs like the fonts from `Get`. Idempotent; returns the same font.
-
-### FontsChanged
-
-```csharp
-SulfurFonts.FontsChanged += () => RebuildMyCachedStyles();
-```
-
-Raised on the main thread after the game's role fonts changed. Bound texts are
-already updated when it fires; subscribe only if you keep font assets yourself.
-
----
-
-## Language API
-
-`SulfurLanguage` is the game's current UI language and one notification when it
-becomes known or changes. Use it instead of reading I2 Localization or subscribing
-to the game's `onLanguageChange` yourself. No game or I2 types appear in it.
-
-### Follow
-
-```csharp
-IDisposable languageFollow = SulfurLanguage.Follow(code => RefreshMyTexts());
-// later, when the UI goes away:
-languageFollow.Dispose();
-```
-
-`IDisposable Follow(Action<string> onLanguage)` calls `onLanguage` with the current
-code right away if the language is already known, otherwise once it becomes known,
-and then after every change. Dispose the result to stop. This is the one call most
-mods need. Exceptions thrown by the callback are logged as warnings and swallowed.
-
-### Code
-
-```csharp
-string code = SulfurLanguage.Code; // "en", "zh-CN", "ja", ...
-```
-
-`string Code { get; }`: the I2 language code, which is also the
-`lang/<code>.json` file name. `"en"` until `IsReady`.
-
-### IsReady
-
-`bool IsReady { get; }`: true once the game's language is known. The game sets its
-startup language without raising an event, so the library checks once per frame
-until the game has finished loading and reports a code, then stops checking.
-
-### IsRightToLeft
-
-`bool IsRightToLeft { get; }`: true for a right-to-left language (Arabic).
-
-### FixRtl
-
-```csharp
-label.text = SulfurLanguage.FixRtl(SulfurLocalization.Get(PluginGuid, "hud.title", "Title"));
-```
-
-`string FixRtl(string text)`: shapes the text for display when the language is
-right to left, the same way the game shapes its own translations; otherwise returns
-it unchanged. Call it once when you resolve the text, not every frame.
-
-### Changed
-
-```csharp
-SulfurLanguage.Changed += code => RefreshMyTexts();
-```
-
-`event Action<string> Changed`: raised on the main thread once when the language
-first becomes known, then after every change (only when the code actually changed).
-On a change it runs after all of the game's own language-change handlers, so text
-you set is not overwritten by the game. Each subscriber runs in its own try/catch.
-`SulfurLocalization.CurrentLanguageCode` and `LanguageVersion` are already updated
-when it fires. Prefer `Follow`, which also covers the initial language.
+| Member | |
+|---|---|
+| `Plugin.PluginGuid` / `PluginName` / `PluginVersion` | `"ryuka.sulfur.nativeui"`, `"SULFUR Native UI Lib"`, `"0.11.0"` (constants, compiled into your mod) |
+| `SulfurFoldoutStyle` (`Plugin`, `Section`, `Group`) | public enum; no public method takes it |
