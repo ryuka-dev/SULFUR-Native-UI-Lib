@@ -51,6 +51,12 @@
   `SulfurListHandle.Update`). Before, pressing the 2nd button of a row whose
   callback rebuilt the page moved the focus back to the 1st button, so the next
   Enter pressed the wrong one.
+- **Badges fit their text and badge rows wrap.** Badges were always 100px wide (the
+  intended text-based width never reached the layout), so longer text such as
+  "Restart Required" or most translations was cut off with "…". A badge now keeps
+  its 100px minimum and grows to its measured text width, up to 240px; a row whose
+  badges don't fit wraps onto further lines instead of running past the right edge.
+  Badges that fitted before are unchanged.
 - **Long descriptions and messages no longer cover the next row.** Description,
   message and text rows had a fixed height while their text wrapped; they now grow
   with the text (single-line rows keep their exact height).

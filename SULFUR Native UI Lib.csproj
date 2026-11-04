@@ -132,6 +132,7 @@
     <Compile Include="Rows\SulfurCycleHandle.cs" />
     <Compile Include="Rows\SulfurButtonRowNavigator.cs" />
     <Compile Include="Rows\SulfurBadgeRowHandle.cs" />
+    <Compile Include="Rows\SulfurBadgeFlowLayout.cs" />
     <Compile Include="Rows\SulfurRowHeightFitter.cs" />
     <Compile Include="Input\SulfurTextInputBinding.cs" />
     <Compile Include="Input\SulfurInputCaretOverlay.cs" />

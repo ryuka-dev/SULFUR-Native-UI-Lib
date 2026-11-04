@@ -1498,26 +1498,19 @@ namespace Ryuka.Sulfur.NativeUI
             if ((empty && !createWhenEmpty) || !EnsureAlive("AddBadgeRow"))
                 return null;
 
-            GameObject row = new GameObject("SULFUR_BadgeRow", typeof(RectTransform), typeof(LayoutElement), typeof(HorizontalLayoutGroup));
+            GameObject row = new GameObject("SULFUR_BadgeRow", typeof(RectTransform), typeof(LayoutElement), typeof(SulfurBadgeFlowLayout));
             row.transform.SetParent(OptionsContainer, false);
 
             RectTransform rowRt = row.GetComponent<RectTransform>();
             ApplyNativeRowRect(rowRt, 30f);
 
+            // Width only: the height comes from the flow layout (one line = 30, more when the
+            // badges wrap), so the LayoutElement must not pin it.
             LayoutElement layout = row.GetComponent<LayoutElement>();
-            layout.minHeight = 30f;
-            layout.preferredHeight = 30f;
             layout.minWidth = GetNativeOptionWidth();
             layout.preferredWidth = GetNativeOptionWidth();
 
-            HorizontalLayoutGroup group = row.GetComponent<HorizontalLayoutGroup>();
-            group.padding = new RectOffset(24, 12, 5, 5);
-            group.spacing = 8f;
-            group.childAlignment = TextAnchor.MiddleLeft;
-            group.childControlWidth = false;
-            group.childControlHeight = true;
-            group.childForceExpandWidth = false;
-            group.childForceExpandHeight = true;
+            row.GetComponent<SulfurBadgeFlowLayout>().Configure(30f);
 
             if (!empty)
             {
@@ -2338,9 +2331,11 @@ namespace Ryuka.Sulfur.NativeUI
             bg.color = new Color(1f, 1f, 1f, 0.08f);
             bg.raycastTarget = false;
 
+            // Size and position come from the row's SulfurBadgeFlowLayout (width measured from
+            // the label's text); the LayoutElement only states the badge's natural size.
             LayoutElement layout = badge.GetComponent<LayoutElement>();
-            layout.minWidth = GetBadgeWidth(text);
-            layout.preferredWidth = layout.minWidth;
+            layout.minWidth = SulfurBadgeFlowLayout.MinBadgeWidth;
+            layout.preferredWidth = SulfurBadgeFlowLayout.MinBadgeWidth;
             layout.minHeight = 26f;
             layout.preferredHeight = 26f;
 
@@ -2374,12 +2369,6 @@ namespace Ryuka.Sulfur.NativeUI
         }
 
         internal const string BadgeObjectPrefix = "Badge_";
-
-        // The LayoutElement width CreateBadge gives a badge with this text.
-        internal static float GetBadgeWidth(string text)
-        {
-            return Mathf.Clamp((text ?? "").Length * 9f + 26f, 70f, 220f);
-        }
 
         private UIButton CreateSmallButton(Transform parent, string label, Action onPressed)
         {

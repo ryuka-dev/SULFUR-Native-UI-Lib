@@ -556,7 +556,9 @@ namespace Ryuka.Sulfur.NativeUI
             // Description and message rows wrap in this style: their height follows the line
             // count from the compact single-line height (the fitter re-measures with the new
             // font size and the indented width).
-            if (isBadge)
+            // Badge rows: 28 is the compact height of one line; more lines are added by the
+            // row's flow layout when the badges wrap, so the height is not pinned here.
+            if (isBadge && !SulfurBadgeFlowLayout.SetBaseHeight(child.gameObject, 28f))
                 SetRowHeight(rt, layout, 28f);
             else if (isMessage)
                 SetWrappingRowHeight(child.gameObject, rt, layout, 38f);

@@ -231,6 +231,12 @@ ctx.AddBadgeRow("Entries: 3", "Pending: 1");
 Adds a compact row of badges. To change the badges later without a rebuild, use
 `AddBadgeRowEx` (see [AddBadgeRowEx → SulfurBadgeRowHandle](#addbadgerowex--sulfurbadgerowhandle)).
 
+Each badge is at least 100px wide and grows to fit its text, measured with its real
+font, so translated and CJK text is not cut off; text beyond 240px is ellipsised.
+When the badges don't fit on one line the row wraps onto further lines and grows;
+the next row moves down. Width and wrapping follow text changes automatically
+(`SetBadge`, `SulfurSettingHandle.SetDirty`, a language change).
+
 ### AddSmallButton
 
 ```csharp

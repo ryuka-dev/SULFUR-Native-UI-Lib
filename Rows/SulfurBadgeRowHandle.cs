@@ -96,15 +96,10 @@ namespace Ryuka.Sulfur.NativeUI
             if (label == null)
                 return false;
 
+            // The row's flow layout re-measures the badge (and re-wraps the row) in the layout
+            // rebuild TMP requests for the new text.
             label.text = trimmed;
             badge.name = SulfurOptionsContext.BadgeObjectPrefix + trimmed;
-
-            LayoutElement layout = badge.GetComponent<LayoutElement>();
-            if (layout != null)
-            {
-                layout.minWidth = SulfurOptionsContext.GetBadgeWidth(trimmed);
-                layout.preferredWidth = layout.minWidth;
-            }
 
             return true;
         }
