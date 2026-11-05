@@ -51,12 +51,17 @@ Not user documentation — users read `README.md` and `docs/API_REFERENCE.md`. C
 ## Language
 
 - Every language change ends in `AsyncAssetLoading.ChangeLanguage(string)`, whose body
-  invokes `onLanguageChange`; a postfix there runs after all of the game's handlers. That is
-  where `SulfurLanguage.Changed` is raised, so mod text set from it is not overwritten.
+  invokes `onLanguageChange`; a finalizer there runs after all of the game's handlers, and also
+  when one of them throws (a postfix would not). That is where `SulfurLanguage.Changed` is
+  raised, so mod text set from it is not overwritten.
 - `ChangeLanguage(float)` loads the language's font set asynchronously and commits when that
-  finishes, so the player can reach a custom page before the commit. A postfix does not run
-  when a handler throws, and `OptionsScreenOption.UpdateTexts` throws on any row without a
-  `PlayerSetting`, which is every library row: `SulfurOptionTextsGuard` skips it for those.
+  finishes, so the player can reach a custom page before the commit. That page is built with
+  the old language's fonts, which the game then releases (blank text, and a
+  NullReferenceException from anything measuring it), so `SulfurCustomCategoryMarker` rebuilds
+  it. `OptionsScreenOption.UpdateTexts` throws on any row without a `PlayerSetting`, which is
+  every library row, and that stops the remaining handlers: `SulfurOptionTextsGuard` skips it.
+- A handler that throws during the font-set path also leaves `fontAssetsLoader` set, and the
+  game then ignores further language changes until it restarts. Nothing here can undo that.
 - In Traditional Chinese `CurrentLanguageCode` is `zh` at startup and `zh-TW` after an in-game
   change: the language's font set is a one-language I2 source coded `zh`, added before the
   main source at startup and after it on a change. `SulfurGameLanguage` reports `zh-TW` for

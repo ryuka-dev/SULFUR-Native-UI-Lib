@@ -67,7 +67,9 @@ row after building it.
   [page state](#page-state) (runtime only; foldout open/closed lives there too).
 - Page text needs no language handling: the language is changed on the game's own General
   page, which ends your page's context, and the next open builds your page again in the new
-  language. The category name is re-read from `GetDisplayName`.
+  language. If your page is open when the change takes effect (the game loads the language's
+  fonts first, so a player can get there), it is rebuilt. The category name is re-read from
+  `GetDisplayName`.
 - A `BuildPage` that throws shows one error row ("This page failed to load. See the BepInEx
   log.") and the exception is logged (in full the first time).
 - Main thread only. A callback from another thread must hand its work to the main thread

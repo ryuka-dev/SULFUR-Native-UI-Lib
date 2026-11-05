@@ -19,7 +19,8 @@ namespace Ryuka.Sulfur.NativeUI
     ///  - Changes: every change, including the font-set path <c>ExecuteChangeLanguage</c>, ends
     ///    in <c>AsyncAssetLoading.ChangeLanguage(string)</c>, which sets
     ///    <c>LocalizationManager.CurrentLanguage</c> and then invokes <c>onLanguageChange</c>.
-    ///    A postfix on that method therefore runs after every game handler.
+    ///    A finalizer on that method runs after every game handler, and also when one of them
+    ///    throws: the language is committed by then, but a postfix would never run.
     ///
     /// Typed access is wrapped so a game update that removes or renames any of these fails
     /// once, deterministically, with one log line: the library then stays in English.
@@ -30,7 +31,7 @@ namespace Ryuka.Sulfur.NativeUI
 
         /// <summary>
         /// Raised after the game committed a language change (from the
-        /// <c>ChangeLanguage(string)</c> postfix). Fired even when nothing changed; the
+        /// <c>ChangeLanguage(string)</c> finalizer). Fired even when nothing changed; the
         /// listener compares.
         /// </summary>
         internal static event Action LanguageCommitted;
@@ -115,8 +116,8 @@ namespace Ryuka.Sulfur.NativeUI
             if (target == null)
                 throw new MissingMethodException("AsyncAssetLoading", "ChangeLanguage(string)");
 
-            MethodInfo postfix = AccessTools.Method(typeof(SulfurGameLanguage), nameof(ChangeLanguagePostfix));
-            harmony.Patch(target, postfix: new HarmonyMethod(postfix));
+            MethodInfo finalizer = AccessTools.Method(typeof(SulfurGameLanguage), nameof(ChangeLanguageFinalizer));
+            harmony.Patch(target, finalizer: new HarmonyMethod(finalizer));
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -153,7 +154,9 @@ namespace Ryuka.Sulfur.NativeUI
             return LocalizationManager.FixRTL_IfNeeded(text);
         }
 
-        private static void ChangeLanguagePostfix()
+        // Takes no __exception and returns nothing, so an exception from a handler still
+        // reaches the game unchanged.
+        private static void ChangeLanguageFinalizer()
         {
             Action handler = LanguageCommitted;
             if (handler == null)

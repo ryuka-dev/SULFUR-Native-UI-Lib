@@ -405,6 +405,20 @@ namespace Ryuka.Sulfur.NativeUI
             return true;
         }
 
+        /// <summary>Rebuilds <paramref name="pageId"/> on every screen currently showing it.</summary>
+        public static void RebuildCustomPageIfCurrent(string pageId)
+        {
+            // A rebuild replaces the entry of its screen, so walk a copy.
+            foreach (CustomPageState state in new List<CustomPageState>(currentCustomPageByScreen.Values))
+            {
+                if (state != null && state.Context != null &&
+                    string.Equals(state.PageId, pageId, StringComparison.OrdinalIgnoreCase))
+                {
+                    state.Context.Rebuild();
+                }
+            }
+        }
+
         public static void RebuildCurrentCustomPage(OptionsScreen screen)
         {
             // Building into a hidden screen is wasted work and the scroll restore coroutine

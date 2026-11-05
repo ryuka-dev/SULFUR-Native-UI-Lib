@@ -77,6 +77,11 @@ namespace Ryuka.Sulfur.NativeUI
         private void OnLanguageChanged(string languageCode)
         {
             ForceApplyLabel();
+
+            // Normally the page is not open: the language selector is on the General page. But
+            // the game commits after loading the language's fonts, so the player can reach a
+            // custom page first, and that page's text and fonts are then the old language's.
+            SulfurOptionsScreenBridge.RebuildCustomPageIfCurrent(PageId);
         }
 
         private void CacheLabels()

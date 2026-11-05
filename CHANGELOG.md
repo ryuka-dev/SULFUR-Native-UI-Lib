@@ -21,6 +21,10 @@
   game setting, so the game's own text refresh threw on them, which stopped the remaining
   language handlers and left the library on the old language until the next change. This
   happened when a custom page was opened while the new language's fonts were loading.
+- **A page opened during a language change no longer goes blank.** It was built with the old
+  language's fonts, which the game then releases, so some of its text disappeared until the
+  page was reopened. An open custom page is now rebuilt when the change takes effect.
+- **The library follows a language change even if another mod's handler throws.**
 - **The footer's left text is no longer cut off early.** The status text's huge preferred
   width squeezed it to its minimum, so a summary such as `Dirty: 0 | Files: 2 | Apply Count: 0`
   ended in an ellipsis with free space beside it. It now takes the width it needs, and is
