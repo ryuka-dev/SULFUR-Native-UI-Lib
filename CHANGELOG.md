@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **`zh-TW` falls back to `zh-CN`.** `SulfurLocalization.Get` now tries `zh-TW`, `zh-CN`,
+  `zh`, `en`, so text without a Traditional Chinese translation shows in Simplified Chinese
+  instead of English. This covers every mod that reads its text through the library,
+  and the library's own `ui.*` text. Other languages are unchanged.
+
 ## 0.11.0
 
 ### Fixed

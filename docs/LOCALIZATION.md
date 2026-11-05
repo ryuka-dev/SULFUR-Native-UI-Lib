@@ -14,7 +14,7 @@ BepInEx/plugins/YourName-Example/
    └─ ...
 ```
 
-- The file name is the game's language code: `en sv fr it de es pt ru pl ja ko zh-CN tr ar`.
+- The file name is the game's language code: `en sv fr it de es pt ru pl ja ko zh-CN zh-TW tr ar`.
   Use a hyphen (`zh-CN.json`, not `zh_CN.json`).
 - `en.json` is the reference and should hold every key.
 - UTF-8 without BOM.
@@ -46,9 +46,11 @@ SulfurLocalization.LoadPluginLocalization(PluginGuid, Info.Location);   // once,
 string text = SulfurLocalization.Get(PluginGuid, "page.footer.status", "Changes are saved immediately.");
 ```
 
-`Get` tries the current language (`zh-TW`), then the language without region (`zh`), then
-`en`, key by key, and returns `fallback` when none has the key. Keep every fallback equal to
-its `en.json` value, so a missing file and a loaded English file look the same. `Get` does no
+`Get` tries the current language (`pt-BR`), then the language without region (`pt`), then
+`en`, key by key, and returns `fallback` when none has the key. `zh-TW` has its own chain:
+`zh-TW`, `zh-CN`, `zh`, `en`, so Traditional Chinese players see Simplified Chinese rather
+than English for anything not translated yet. Keep every fallback equal to its `en.json`
+value, so a missing file and a loaded English file look the same. `Get` does no
 formatting: put placeholders in the value and fill them with `string.Format`. When to look
 texts up again after a language change: [API reference: Language](API_REFERENCE.md#language).
 
@@ -75,4 +77,5 @@ out of the prefixes above.
 
 Message prefixes, input placeholders, "Default", "Apply", "MOD", the built-in setting-row
 badges and the page-failed message come from the library's own `lang/` folder (keys
-`ui.*`, all 14 languages). A missing folder makes them fall back to English.
+`ui.*`; every language except `zh-TW`, which uses the `zh-CN` text). A missing folder makes
+them fall back to English.

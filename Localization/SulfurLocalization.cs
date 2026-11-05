@@ -15,7 +15,8 @@ namespace Ryuka.Sulfur.NativeUI
         // Owned by SulfurLanguage: updated from OnLanguageChanged, never polled.
         private static string cachedLanguageCode = "en";
 
-        // Lookup order for Get: exact code -> language without region -> en.
+        // Lookup order for Get: exact code -> related language (zh-TW -> zh-CN) ->
+        // language without region -> en.
         // Rebuilt on language change so Get does not allocate.
         private static string[] languageFallbacks = BuildLanguageFallbacks("en");
 
@@ -359,11 +360,16 @@ namespace Ryuka.Sulfur.NativeUI
 
         private static string[] BuildLanguageFallbacks(string current)
         {
-            List<string> result = new List<string>(3);
+            List<string> result = new List<string>(4);
 
             if (!string.IsNullOrWhiteSpace(current))
             {
                 result.Add(current);
+
+                // Readers of Traditional Chinese are better served by Simplified Chinese
+                // than by English, and mods rarely ship a zh-TW file yet.
+                if (current == "zh-TW")
+                    result.Add("zh-CN");
 
                 int dash = current.IndexOf('-');
 

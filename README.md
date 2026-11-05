@@ -237,7 +237,7 @@ namespace YourName.Sulfur.Example
 
 `lang/en.json` (UTF-8 without BOM). Every fallback string in the code must equal its
 `en.json` value. Other languages use the same keys, e.g. `lang/zh-CN.json`; a missing key
-falls back to English.
+falls back to English (`zh-TW` tries `zh-CN` first).
 
 ```json
 {
