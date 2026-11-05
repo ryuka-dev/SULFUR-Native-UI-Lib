@@ -908,8 +908,11 @@ namespace Ryuka.Sulfur.NativeUI
             // by role.
             TextMeshProUGUI sample = FindFooterStyleSample(screen);
 
-            TextMeshProUGUI left = CreateFooterText(root.transform, "LeftText", sample, TextAlignmentOptions.MidlineLeft, 360f, 460f, 0f);
-            TextMeshProUGUI status = CreateFooterText(root.transform, "StatusText", sample, TextAlignmentOptions.MidlineLeft, 260f, 9999f, 1f);
+            // The layout group shares a shortage in proportion to (preferred - min), so the
+            // status text must not state a huge preferred width: it takes what is left through
+            // flexibleWidth. A negative preferred width lets the left text report its own.
+            TextMeshProUGUI left = CreateFooterText(root.transform, "LeftText", sample, TextAlignmentOptions.MidlineLeft, 360f, -1f, 0f);
+            TextMeshProUGUI status = CreateFooterText(root.transform, "StatusText", sample, TextAlignmentOptions.MidlineLeft, 260f, 260f, 1f);
 
             LayoutElement statusLayout = status.gameObject.GetComponent<LayoutElement>();
             statusLayout.flexibleWidth = 1f;

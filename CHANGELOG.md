@@ -21,6 +21,10 @@
   game setting, so the game's own text refresh threw on them, which stopped the remaining
   language handlers and left the library on the old language until the next change. This
   happened when a custom page was opened while the new language's fonts were loading.
+- **The footer's left text is no longer cut off early.** The status text's huge preferred
+  width squeezed it to its minimum, so a summary such as `Dirty: 0 | Files: 2 | Apply Count: 0`
+  ended in an ellipsis with free space beside it. It now takes the width it needs, and is
+  only shortened when the bar is really full.
 
 ## 0.11.0
 
