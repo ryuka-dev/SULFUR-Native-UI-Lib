@@ -106,7 +106,7 @@ For an optional dependency see
 BepInEx/plugins/
 ├─ ryuka_labs-SULFUR_Native_UI_Lib/
 │  ├─ SULFUR Native UI Lib.dll
-│  └─ lang/                      the library's own text (14 languages)
+│  └─ lang/                      the library's own text (15 languages)
 └─ YourName-Example/
    ├─ YourName.Sulfur.Example.dll
    └─ lang/

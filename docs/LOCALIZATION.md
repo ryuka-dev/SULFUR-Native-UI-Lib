@@ -77,5 +77,4 @@ out of the prefixes above.
 
 Message prefixes, input placeholders, "Default", "Apply", "MOD", the built-in setting-row
 badges and the page-failed message come from the library's own `lang/` folder (keys
-`ui.*`; every language except `zh-TW`, which uses the `zh-CN` text). A missing folder makes
-them fall back to English.
+`ui.*`, all 15 languages). A missing folder makes them fall back to English.

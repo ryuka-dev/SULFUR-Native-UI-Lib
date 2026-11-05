@@ -13,7 +13,7 @@ Bump together (they drift otherwise):
 
 ## Package
 
-- The zip must contain `lang/*.json` (14 files) next to the DLL. Without them the
+- The zip must contain `lang/*.json` (15 files) next to the DLL. Without them the
   library's own text silently falls back to English. The build copies the root `lang/`
   into `Thunderstore/lang/` (gitignored) next to the DLL; the packaging script
   (`sulfur-thunderstore` pack) zips that folder.
@@ -24,7 +24,7 @@ Bump together (they drift otherwise):
 - Pack with the `sulfur-thunderstore` script. Build first with
   `dotnet build -c Release -p:DeployDir=<scratch folder>` and pack with `-NoBuild`; a plain
   build also deploys into the csproj's default profile. Check the zip: DLL, XML, `lang/`
-  (14), manifest, icon, README, CHANGELOG — nothing else.
+  (15), manifest, icon, README, CHANGELOG — nothing else.
 - `lang/*.json` must stay LF without BOM (`.gitattributes` pins them).
 
 ## Compatibility with published dependents

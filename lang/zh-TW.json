@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "key": "ui.message.warning_prefix",
+      "value": "警告："
+    },
+    {
+      "key": "ui.message.error_prefix",
+      "value": "錯誤："
+    },
+    {
+      "key": "ui.message.success_prefix",
+      "value": "成功："
+    },
+    {
+      "key": "ui.input.placeholder",
+      "value": "輸入文字..."
+    },
+    {
+      "key": "ui.page.no_options",
+      "value": "沒有選項。"
+    },
+    {
+      "key": "ui.badge.dirty",
+      "value": "待套用"
+    },
+    {
+      "key": "ui.badge.clean",
+      "value": "未修改"
+    },
+    {
+      "key": "ui.button.default",
+      "value": "預設"
+    },
+    {
+      "key": "ui.footer.apply",
+      "value": "套用"
+    },
+    {
+      "key": "ui.foldout.mod_tag",
+      "value": "模組"
+    },
+    {
+      "key": "ui.input.number_placeholder",
+      "value": "輸入數字..."
+    },
+    {
+      "key": "ui.page.load_failed",
+      "value": "此頁面載入失敗。請查看 BepInEx 記錄檔。"
+    },
+    {
+      "key": "ui.badge.restart_required",
+      "value": "需要重新啟動"
+    },
+    {
+      "key": "ui.badge.live_apply",
+      "value": "即時生效"
+    },
+    {
+      "key": "ui.badge.advanced",
+      "value": "進階"
+    },
+    {
+      "key": "ui.badge.hidden",
+      "value": "隱藏"
+    },
+    {
+      "key": "ui.badge.dangerous",
+      "value": "危險"
+    }
+  ]
+}

@@ -17,7 +17,7 @@ This mod does nothing by itself. Install it when another mod lists it as a depen
 - A centred message banner during play
 - The game's fonts for the current language, with automatic glyph fallback for Chinese,
   Japanese, Korean and symbols
-- Follows the game's language; the library's own text is translated into all 14 game
+- Follows the game's language; the library's own text is translated into all 15 game
   languages
 
 ## Installation
