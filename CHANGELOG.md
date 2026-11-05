@@ -11,6 +11,17 @@
 - **The library's own text is translated into Traditional Chinese** (`lang/zh-TW.json`), using
   the game's own terms where it has them.
 
+### Fixed
+
+- **Starting the game in Traditional Chinese is now recognised as `zh-TW`.** The game reports
+  `zh` at startup and `zh-TW` after an in-game change, so a player who started in Traditional
+  Chinese got neither the `zh-TW` file nor the `zh-CN` fallback. `SulfurLanguage.Code` and
+  lookups now use `zh-TW` in both cases.
+- **A language change no longer breaks while a custom page is open.** Library rows have no
+  game setting, so the game's own text refresh threw on them, which stopped the remaining
+  language handlers and left the library on the old language until the next change. This
+  happened when a custom page was opened while the new language's fonts were loading.
+
 ## 0.11.0
 
 ### Fixed

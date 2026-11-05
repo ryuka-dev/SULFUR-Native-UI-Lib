@@ -119,6 +119,7 @@
     <Compile Include="Integration\SulfurOptionsScreenBridge.cs" />
     <Compile Include="Integration\SulfurOptionsScreenPatch.cs" />
     <Compile Include="Integration\SulfurMainMenuHoverGuard.cs" />
+    <Compile Include="Integration\SulfurOptionTextsGuard.cs" />
     <Compile Include="Integration\SulfurCustomCategoryMarker.cs" />
     <Compile Include="Integration\SulfurNavigationProxy.cs" />
     <Compile Include="Rows\SulfurSettingRow.cs" />

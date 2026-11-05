@@ -136,7 +136,13 @@ namespace Ryuka.Sulfur.NativeUI
             if (string.IsNullOrWhiteSpace(current))
                 return false;
 
+            // The Traditional Chinese font set is its own I2 source, coded "zh". At startup it
+            // comes before the main source and wins the code lookup; after an in-game change it
+            // comes after it and the code is "zh-TW". Same language, so report one code.
             code = current.Trim();
+            if (string.Equals(code, "zh", StringComparison.OrdinalIgnoreCase))
+                code = "zh-TW";
+
             rightToLeft = LocalizationManager.IsRight2Left;
             return true;
         }

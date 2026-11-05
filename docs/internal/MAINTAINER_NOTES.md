@@ -53,6 +53,14 @@ Not user documentation — users read `README.md` and `docs/API_REFERENCE.md`. C
 - Every language change ends in `AsyncAssetLoading.ChangeLanguage(string)`, whose body
   invokes `onLanguageChange`; a postfix there runs after all of the game's handlers. That is
   where `SulfurLanguage.Changed` is raised, so mod text set from it is not overwritten.
+- `ChangeLanguage(float)` loads the language's font set asynchronously and commits when that
+  finishes, so the player can reach a custom page before the commit. A postfix does not run
+  when a handler throws, and `OptionsScreenOption.UpdateTexts` throws on any row without a
+  `PlayerSetting`, which is every library row: `SulfurOptionTextsGuard` skips it for those.
+- In Traditional Chinese `CurrentLanguageCode` is `zh` at startup and `zh-TW` after an in-game
+  change: the language's font set is a one-language I2 source coded `zh`, added before the
+  main source at startup and after it on a change. `SulfurGameLanguage` reports `zh-TW` for
+  both, so a test must cover a start in the language as well as a switch to it.
 - The startup language is set in `LoadLanguage` without any event. `SulfurLanguage` checks
   from `Plugin.Update` until `AsyncAssetLoading.loadingDone` and a non-empty
   `LocalizationManager.CurrentLanguageCode`, then stops checking.
