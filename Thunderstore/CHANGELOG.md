@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.1
+Fixed
+- Traditional Chinese: a game started in Traditional Chinese is now recognised as such. Mods that read their text through the library show Traditional Chinese when they have it, and Simplified Chinese instead of English when they do not.
+- A language change no longer breaks if you open a mod's Options page while the new language is loading. The page no longer loses text and is shown in the new language.
+- The library follows a language change even if another mod's language handler fails.
+- The summary at the bottom of a mod's Options page is no longer cut off early.
+
+Added
+- The library's own text is translated into Traditional Chinese, so all 15 game languages are covered.
+
 ## 0.11.0
 Fixed
 - Toasts and the popup banner no longer lose Chinese (and other non-Latin) characters, and no longer change font from one session to the next. They now use the game's own fonts for the current language and follow a language change while shown.

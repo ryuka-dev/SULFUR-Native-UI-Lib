@@ -22,7 +22,7 @@ This mod does nothing by itself. Install it when another mod lists it as a depen
 [/list]
   Japanese, Korean and symbols
 [list]
-[*]Follows the game's language; the library's own text is translated into all 14 game[/*]
+[*]Follows the game's language; the library's own text is translated into all 15 game[/*]
 [/list]
   languages
 
@@ -38,7 +38,7 @@ Keep the [color=#ffff00]lang/[/color] folder next to the DLL; without it the lib
 [color=RoyalBlue][b]Requirements[/b][/color]
 
 [list]
-[*]SULFUR 1.0.4[/*]
+[*]SULFUR 1.0.5[/*]
 [*]BepInEx 5 (BepInExPack 5.4.2100)[/*]
 [/list]
 [color=RoyalBlue][b]For mod developers[/b][/color]
@@ -50,6 +50,18 @@ third-party binaries.
 
 [font=Arial Black][color=DarkOrange][size=5][b]Changelog[/b][/size][/color][/font]
 
+[color=RoyalBlue][b]0.11.1[/b][/color]
+Fixed
+[list]
+[*]Traditional Chinese: a game started in Traditional Chinese is now recognised as such. Mods that read their text through the library show Traditional Chinese when they have it, and Simplified Chinese instead of English when they do not.[/*]
+[*]A language change no longer breaks if you open a mod's Options page while the new language is loading. The page no longer loses text and is shown in the new language.[/*]
+[*]The library follows a language change even if another mod's language handler fails.[/*]
+[*]The summary at the bottom of a mod's Options page is no longer cut off early.[/*]
+[/list]
+Added
+[list]
+[*]The library's own text is translated into Traditional Chinese, so all 15 game languages are covered.[/*]
+[/list]
 [color=RoyalBlue][b]0.11.0[/b][/color]
 Fixed
 [list]

@@ -34,7 +34,7 @@ Keep the `lang/` folder next to the DLL; without it the library's own text shows
 
 ## Requirements
 
-- SULFUR 1.0.4
+- SULFUR 1.0.5
 - BepInEx 5 (BepInExPack 5.4.2100)
 
 ## For mod developers

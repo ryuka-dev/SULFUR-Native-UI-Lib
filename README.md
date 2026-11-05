@@ -4,7 +4,7 @@ A BepInEx library that lets SULFUR mods add their own pages to the game's native
 screen, built from rows that look and behave like the game's own (mouse, keyboard and
 gamepad), plus two HUD surfaces for in-game messages.
 
-Current target version: `0.11.0`
+Current target version: `0.11.1`
 
 ## Features
 
@@ -24,7 +24,7 @@ Current target version: `0.11.0`
 
 ### Requirements
 
-- SULFUR 1.0.4
+- SULFUR 1.0.5
 - BepInEx 5 (`BepInEx-BepInExPack-5.4.2100`)
 - A mod project targeting .NET Framework 4.7.2
 
